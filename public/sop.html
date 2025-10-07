@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SOP Management</title>
+</head>
+<body>
+  <h2>SOP Management</h2>
+  <a href="dashboard.html">Dashboard</a>
+
+  <h3>All SOPs</h3>
+  <ul id="sopList"></ul>
+
+  <h3>Add New SOP</h3>
+  <form id="addSopForm">
+    <input type="text" id="title" placeholder="Title" required><br>
+    <textarea id="content" placeholder="Content" required></textarea><br>
+    <button type="submit">Add SOP</button>
+  </form>
+
+  <script>
+    async function loadSops() {
+      try {
+        const res = await fetch("/api/sops");
+        if (!res.ok) {
+          console.error("Failed to load SOPs:", await res.text());
+          return;
+        }
+        const data = await res.json();
+        const list = document.getElementById("sopList");
+        list.innerHTML = "";
+        data.forEach(s => {
+          const li = document.createElement("li");
+          li.textContent = `${s.title} - ${s.content}`;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        console.error("Error fetching SOPs:", err);
+      }
+    }
+
+    document.getElementById("addSopForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const title = document.getElementById("title").value;
+      const content = document.getElementById("content").value;
+
+      try {
+        const res = await fetch("/api/sops", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({title, content})
+        });
+
+        if (!res.ok) {
+          console.error("Add SOP failed:", await res.text());
+          alert("Failed to add SOP");
+          return;
+        }
+
+        const data = await res.json();
+        alert(data.message);
+        loadSops();
+        document.getElementById("addSopForm").reset();
+      } catch (err) {
+        console.error("Error adding SOP:", err);
+        alert("Error adding SOP");
+      }
+    });
+
+    loadSops();
+  </script>
+</body>
+</html>

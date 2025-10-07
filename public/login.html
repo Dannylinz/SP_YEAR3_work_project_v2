@@ -19,26 +19,30 @@
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+
       const data = {
         email: document.getElementById("email").value,
         password: document.getElementById("password").value
       };
+
       try {
         const res = await fetch("/api/users/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data)
         });
+
         const result = await res.json();
         message.textContent = result.message;
+        message.style.color = res.ok ? "green" : "red";
 
         if (res.ok) {
-          // Store user info in localStorage for dashboard
           localStorage.setItem("user", JSON.stringify(result.user));
-          window.location.href = "dashboard.html";
+          setTimeout(() => window.location.href = "dashboard.html", 500);
         }
       } catch (err) {
-        message.textContent = "Error: " + err.message;
+        message.textContent = "Network error: " + err.message;
+        message.style.color = "red";
       }
     });
   </script>
