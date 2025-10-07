@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head><title>FAQ</title></head>
+<body>
+<h2>FAQ</h2>
+<a href="dashboard.html">Dashboard</a>
+
+<ul id="faqList"></ul>
+
+<form id="addFaqForm">
+  <input type="text" id="question" placeholder="Question" required>
+  <input type="text" id="answer" placeholder="Answer" required>
+  <button type="submit">Add FAQ</button>
+</form>
+
+<script>
+async function loadFaqs() {
+  const res = await fetch("/api/faqs");
+  const data = await res.json();
+  const list = document.getElementById("faqList");
+  list.innerHTML = "";
+  data.forEach(f => {
+    const li = document.createElement("li");
+    li.textContent = f.question + " - " + f.answer;
+    list.appendChild(li);
+  });
+}
+document.getElementById("addFaqForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const question = document.getElementById("question").value;
+  const answer = document.getElementById("answer").value;
+  const res = await fetch("/api/faqs", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({question, answer})
+  });
+  const data = await res.json();
+  alert(data.message);
+  loadFaqs();
+});
+loadFaqs();
+</script>
+</body>
+</html>

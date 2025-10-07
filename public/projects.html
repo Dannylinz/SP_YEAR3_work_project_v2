@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head><title>Projects</title></head>
+<body>
+<h2>Projects</h2>
+<a href="dashboard.html">Dashboard</a>
+
+<ul id="projectList"></ul>
+
+<form id="addProjectForm">
+  <input type="text" id="name" placeholder="Project Name" required>
+  <input type="text" id="description" placeholder="Description" required>
+  <button type="submit">Add Project</button>
+</form>
+
+<script>
+async function loadProjects() {
+  const res = await fetch("/api/projects");
+  const data = await res.json();
+  const list = document.getElementById("projectList");
+  list.innerHTML = "";
+  data.forEach(p => {
+    const li = document.createElement("li");
+    li.textContent = p.name + " - " + p.description;
+    list.appendChild(li);
+  });
+}
+document.getElementById("addProjectForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const name = document.getElementById("name").value;
+  const description = document.getElementById("description").value;
+  const res = await fetch("/api/projects", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({name, description})
+  });
+  const data = await res.json();
+  alert(data.message);
+  loadProjects();
+});
+loadProjects();
+</script>
+</body>
+</html>

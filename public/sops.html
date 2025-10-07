@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head><title>SOP</title></head>
+<body>
+<h2>SOP</h2>
+<a href="dashboard.html">Dashboard</a>
+
+<ul id="sopList"></ul>
+
+<form id="addSopForm">
+  <input type="text" id="title" placeholder="Title" required>
+  <input type="text" id="description" placeholder="Description" required>
+  <button type="submit">Add SOP</button>
+</form>
+
+<script>
+async function loadSops() {
+  const res = await fetch("/api/sops");
+  const data = await res.json();
+  const list = document.getElementById("sopList");
+  list.innerHTML = "";
+  data.forEach(s => {
+    const li = document.createElement("li");
+    li.textContent = s.title + " - " + s.description;
+    list.appendChild(li);
+  });
+}
+document.getElementById("addSopForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const title = document.getElementById("title").value;
+  const description = document.getElementById("description").value;
+  const res = await fetch("/api/sops", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({title, description})
+  });
+  const data = await res.json();
+  alert(data.message);
+  loadSops();
+});
+loadSops();
+</script>
+</body>
+</html>
