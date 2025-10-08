@@ -62,8 +62,7 @@
 
   <script>
     const API_BASE = "http://localhost:3000/api/sops";
-    // Simulate logged-in user info
-    const CURRENT_USER = { user_id: 1, username: "AdminUser" }; // Replace with actual auth data
+    const CURRENT_USER = { user_id: 1, username: "AdminUser" }; // Replace with actual logged-in user
 
     document.addEventListener("DOMContentLoaded", () => {
       const categoryForm = document.getElementById("categoryForm");
@@ -76,6 +75,7 @@
         try {
           const res = await fetch(`${API_BASE}/category`);
           const data = await res.json();
+          console.log("Loaded categories:", data);
           categorySelect.innerHTML = `<option value="">Select Category</option>`;
           data.forEach(cat => {
             const option = document.createElement("option");
@@ -93,6 +93,7 @@
         try {
           const res = await fetch(API_BASE);
           const sops = await res.json();
+          console.log("Loaded SOPs:", sops);
 
           sopList.innerHTML = "";
           if (sops.length === 0) {
@@ -101,13 +102,15 @@
           }
 
           sops.forEach(sop => {
-            // Use attachments from DB
+            console.log("Rendering SOP:", sop);
+
             const attachmentsHTML = sop.attachments && sop.attachments.length > 0
-              ? sop.attachments.map(att => `
-                  <a href="http://localhost:3000/${att.file_path}" target="_blank" class="d-block">
+              ? sop.attachments.map(att => {
+                  console.log("Attachment:", att);
+                  return `<a href="http://localhost:3000/${att.file_path}" target="_blank" class="d-block">
                     📎 ${att.file_name} (View / Download)
-                  </a>
-                `).join("")
+                  </a>`;
+                }).join("")
               : "<em>No attachments</em>";
 
             const sopCard = document.createElement("div");
@@ -117,7 +120,7 @@
                 <h5 class="card-title">${sop.title}</h5>
                 <p class="card-text">${sop.content}</p>
                 <p><strong>Category:</strong> ${sop.category_name || "Uncategorized"}</p>
-                <p><strong>Created by:</strong> ${sop.username || "Unknown"}</p>
+                <p><strong>Created by:</strong> ${sop.username || CURRENT_USER.username}</p>
                 <div><strong>Attachments:</strong><br>${attachmentsHTML}</div>
               </div>
             `;
@@ -141,6 +144,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ category_name: categoryName }),
           });
+          console.log("Add category response:", res);
 
           if (res.ok) {
             alert("Category added successfully!");
@@ -149,7 +153,6 @@
           } else {
             const errData = await res.text();
             console.error("Error adding category:", errData);
-            alert("Failed to add category.");
           }
         } catch (err) {
           console.error("Error adding category:", err);
@@ -165,6 +168,8 @@
         const categoryId = document.getElementById("sop_category").value;
         const file = document.getElementById("sop_file").files[0];
 
+        console.log("Submitting SOP:", { title, desc, categoryId, file });
+
         if (!title || !desc || !categoryId) {
           alert("Please fill in all required fields.");
           return;
@@ -174,22 +179,27 @@
         formData.append("title", title);
         formData.append("content", desc);
         formData.append("category_id", categoryId);
-        if (file) formData.append("file", file);
+        if (file) {
+          console.log("Appending file:", file);
+          formData.append("file", file);
+        }
 
         try {
           const res = await fetch(API_BASE, {
             method: "POST",
             body: formData,
           });
+          console.log("Add SOP response:", res);
 
           if (res.ok) {
+            const data = await res.json();
+            console.log("SOP added successfully:", data);
             alert("SOP added successfully!");
             sopForm.reset();
             loadSOPs(); // refresh list to include new attachments
           } else {
             const errText = await res.text();
             console.error("Error adding SOP:", errText);
-            alert("Failed to add SOP. Check console for details.");
           }
         } catch (err) {
           console.error("Error submitting SOP:", err);
