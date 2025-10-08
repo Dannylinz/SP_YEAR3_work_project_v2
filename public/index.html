@@ -1,15 +1,38 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Meganet Admin System</title>
+  <title>Main Page</title>
 </head>
 <body>
-  <h1>Welcome to Meganet Admin System</h1>
-  <ul>
-    <li><a href="users.html">Users</a></li>
-    <li><a href="projects.html">Projects</a></li>
-    <li><a href="faq.html">FAQs</a></li>
-    <li><a href="sop.html">SOPs</a></li>
-  </ul>
+  <h1>Welcome to Meganet Portal</h1>
+  <p id="welcomeText"></p>
+
+  <nav>
+    <a href="faq.html">FAQ</a> |
+    <a href="sop.html">SOP</a> |
+    <a href="projects.html">Projects</a>
+  </nav>
+
+  <button id="logoutBtn">Logout</button>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const user = JSON.parse(localStorage.getItem("user"));
+      if (!user) {
+        console.warn("No user found, redirecting to login...");
+        window.location.href = "login.html";
+        return;
+      }
+
+      document.getElementById("welcomeText").textContent = `Welcome, ${user.username}!`;
+      console.log("User loaded:", user);
+
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        console.log("Logging out...");
+        localStorage.removeItem("user");
+        window.location.href = "login.html"; // ✅ Redirect after logout
+      });
+    });
+  </script>
 </body>
 </html>

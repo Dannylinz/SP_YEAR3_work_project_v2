@@ -3,7 +3,7 @@
 <head>
   <title>Register</title>
   <style>
-    #message { margin-top: 10px; font-weight: bold; }
+    #message { font-weight: bold; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -22,7 +22,7 @@
     const form = document.getElementById("registerForm");
     const message = document.getElementById("message");
 
-    form.addEventListener("submit", async e => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const data = {
@@ -32,8 +32,8 @@
         password: document.getElementById("password").value
       };
 
-      console.log("Form submitted:", data);
-      message.textContent = "Submitting...";
+      console.log("📨 Sending register data:", data);
+      message.textContent = "";
 
       try {
         const res = await fetch("/api/users/register", {
@@ -42,30 +42,20 @@
           body: JSON.stringify(data)
         });
 
-        let result;
-        try {
-          result = await res.json();
-        } catch (err) {
-          console.error("JSON parse error:", err);
-          message.style.color = "red";
-          message.textContent = "Server error: invalid JSON";
-          return;
-        }
-
-        console.log("Server response:", result);
+        const result = await res.json();
+        console.log("📬 Register response:", result);
 
         if (res.ok) {
           message.style.color = "green";
-          message.textContent = result.message + " Redirecting to login page...";
-          // Wait 1.5s then redirect
+          message.textContent = result.message + " Redirecting to login...";
+          // redirect to login after 1.5s
           setTimeout(() => window.location.href = "login.html", 1500);
         } else {
           message.style.color = "red";
           message.textContent = result.message || "Registration failed";
         }
-
       } catch (err) {
-        console.error("Fetch error:", err);
+        console.error("❌ Register error:", err);
         message.style.color = "red";
         message.textContent = "Network error: " + err.message;
       }

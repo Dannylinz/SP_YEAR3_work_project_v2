@@ -1,80 +1,62 @@
+// src/controllers/userController.js
 const pool = require("../services/db");
 const bcrypt = require("bcrypt");
 
-// Register
+// REGISTER
 exports.registerUser = async (req, res) => {
-  const { username, email, password, full_name } = req.body;
-  console.log("Register request:", req.body);
+  console.log("📨 Register request received:", req.body);
 
-  if (!username || !email || !password) {
-    console.log("Missing fields");
-    return res.status(400).json({ message: "Missing fields" });
-  }
+  const { username, email, password, full_name } = req.body;
+  if (!username || !email || !password)
+    return res.status(400).json({ message: "Missing required fields" });
 
   try {
-    const hashed = await bcrypt.hash(password, 10);
-    console.log("Password hashed");
+    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("🔐 Password hashed");
 
-    const sql = `INSERT INTO User (username, email, password, full_name, created_on, active)
-                 VALUES (?, ?, ?, ?, NOW(), 1)`;
+    const sql = `
+      INSERT INTO User (username, email, password, full_name, created_on, active)
+      VALUES (?, ?, ?, ?, NOW(), 1)
+    `;
 
-    pool.query(sql, [username, email, hashed, full_name || ""], (err, result) => {
-      if (err) {
-        console.error("DB error:", err);
-        if (err.code === "ER_DUP_ENTRY") {
-          return res.status(400).json({ message: "Email already exists" });
-        }
-        return res.status(500).json({ message: "Database error", error: err });
-      }
+    const [result] = await pool.query(sql, [username, email, hashedPassword, full_name || ""]);
+    console.log("✅ User registered successfully with ID:", result.insertId);
 
-      console.log("User registered, ID:", result.insertId);
-      res.status(201).json({ message: "User registered successfully" });
-    });
-
+    return res.status(201).json({ message: "User registered successfully" });
   } catch (err) {
-    console.error("Error hashing password:", err);
-    res.status(500).json({ message: "Server error", error: err });
+    console.error("💥 Register error:", err);
+    if (err.code === "ER_DUP_ENTRY") return res.status(400).json({ message: "Email already registered" });
+    return res.status(500).json({ message: "Database error", error: err.message });
   }
 };
 
-// Login
-exports.loginUser = (req, res) => {
+// LOGIN
+exports.loginUser = async (req, res) => {
+  console.log("📨 Login request received:", req.body);
+
   const { email, password } = req.body;
-  console.log("Login request:", req.body);
+  if (!email || !password)
+    return res.status(400).json({ message: "Missing required fields" });
 
-  if (!email || !password) {
-    console.log("Missing fields");
-    return res.status(400).json({ message: "Missing fields" });
-  }
+  try {
+    const [results] = await pool.query("SELECT * FROM User WHERE email = ?", [email]);
+    console.log("🔍 Query results:", results);
 
-  pool.query("SELECT * FROM User WHERE email = ?", [email], async (err, results) => {
-    if (err) {
-      console.error("DB error:", err);
-      return res.status(500).json({ message: "Database error", error: err });
-    }
-
-    if (results.length === 0) {
-      console.log("User not found");
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+    if (results.length === 0) return res.status(401).json({ message: "Invalid credentials" });
 
     const user = results[0];
-    try {
-      const match = await bcrypt.compare(password, user.password);
-      if (!match) {
-        console.log("Password mismatch");
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
+    const match = await bcrypt.compare(password, user.password);
+    console.log("🔑 Password match:", match);
 
-      console.log("Login successful for user:", user.user_id);
-      res.status(200).json({
-        message: "Login successful",
-        user: { user_id: user.user_id, username: user.username, email: user.email }
-      });
+    if (!match) return res.status(401).json({ message: "Invalid credentials" });
 
-    } catch (err) {
-      console.error("Password compare error:", err);
-      res.status(500).json({ message: "Server error", error: err });
-    }
-  });
+    console.log("✅ Login successful for:", user.username);
+    return res.status(200).json({
+      message: "Login successful",
+      user: { user_id: user.user_id, username: user.username, email: user.email }
+    });
+  } catch (err) {
+    console.error("💥 Login error:", err);
+    return res.status(500).json({ message: "Database error", error: err.message });
+  }
 };
