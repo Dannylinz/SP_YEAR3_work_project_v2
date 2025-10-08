@@ -1,9 +1,17 @@
 const pool = require("../services/db");
 
-// ✅ Get all SOPs
+// ----------------------------
+// GET all SOPs (with category)
 exports.getAllSops = async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM SOP");
+    const sql = `
+      SELECT s.sop_id, s.title, s.content, s.version, s.effective_date, 
+             s.status, s.department_id, s.created_by_user_id, c.category_id, c.category_name
+      FROM SOP s
+      LEFT JOIN SOPCategory c ON s.category_id = c.category_id
+      ORDER BY c.category_name, s.title
+    `;
+    const [rows] = await pool.query(sql);
     res.status(200).json(rows);
   } catch (err) {
     console.error("Error fetching SOPs:", err);
@@ -11,19 +19,20 @@ exports.getAllSops = async (req, res) => {
   }
 };
 
-// ✅ Add SOP
+// ----------------------------
+// ADD a new SOP (with optional category)
 exports.addSop = async (req, res) => {
-  const { title, content } = req.body;
+  const { title, content, category_id } = req.body;
   if (!title || !content) {
     return res.status(400).json({ message: "Missing title or content" });
   }
 
   try {
     const sql = `
-      INSERT INTO SOP (title, content, version, effective_date, created_by_user_id, status, department_id)
-      VALUES (?, ?, '1.0', NULL, 1, 'draft', 1)
+      INSERT INTO SOP (title, content, version, effective_date, created_by_user_id, status, department_id, category_id)
+      VALUES (?, ?, '1.0', NULL, 1, 'draft', 1, ?)
     `;
-    await pool.query(sql, [title, content]);
+    await pool.query(sql, [title, content, category_id || null]);
     res.status(201).json({ message: "SOP added successfully" });
   } catch (err) {
     console.error("Error adding SOP:", err);
@@ -31,15 +40,16 @@ exports.addSop = async (req, res) => {
   }
 };
 
-// ✅ Update SOP  ← make sure this name exactly matches sopRoutes.js
+// ----------------------------
+// UPDATE SOP
 exports.updateSop = async (req, res) => {
   const { sop_id } = req.params;
-  const { title, content } = req.body;
+  const { title, content, category_id } = req.body;
 
   try {
     const [result] = await pool.query(
-      "UPDATE SOP SET title = ?, content = ? WHERE sop_id = ?",
-      [title, content, sop_id]
+      "UPDATE SOP SET title = ?, content = ?, category_id = ? WHERE sop_id = ?",
+      [title, content, category_id || null, sop_id]
     );
 
     if (result.affectedRows === 0)
@@ -52,7 +62,8 @@ exports.updateSop = async (req, res) => {
   }
 };
 
-// ✅ Delete SOP
+// ----------------------------
+// DELETE SOP
 exports.deleteSop = async (req, res) => {
   const { sop_id } = req.params;
   try {
@@ -62,6 +73,36 @@ exports.deleteSop = async (req, res) => {
     res.status(200).json({ message: "SOP deleted successfully" });
   } catch (err) {
     console.error("Error deleting SOP:", err);
+    res.status(500).json({ message: "Database error", error: err });
+  }
+};
+
+// ----------------------------
+// GET all SOP categories
+exports.getAllCategories = async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM SOPCategory ORDER BY category_name");
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error("Error fetching categories:", err);
+    res.status(500).json({ message: "Database error", error: err });
+  }
+};
+
+// ----------------------------
+// ADD a new SOP category
+exports.addCategory = async (req, res) => {
+  const { category_name } = req.body;
+  if (!category_name) return res.status(400).json({ message: "Missing category name" });
+
+  try {
+    await pool.query("INSERT INTO SOPCategory (category_name) VALUES (?)", [category_name]);
+    res.status(201).json({ message: "Category added successfully" });
+  } catch (err) {
+    console.error("Error adding category:", err);
+    if (err.code === "ER_DUP_ENTRY") {
+      return res.status(400).json({ message: "Category already exists" });
+    }
     res.status(500).json({ message: "Database error", error: err });
   }
 };
