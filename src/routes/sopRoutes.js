@@ -1,15 +1,35 @@
 const express = require("express");
 const router = express.Router();
-const sopController = require("../controllers/sopController"); // make sure path is correct
+const multer = require("multer");
+const path = require("path");
+const sopController = require("../controllers/sopController");
 
+// File storage configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + "-" + file.originalname;
+    cb(null, uniqueName);
+  },
+});
+
+const upload = multer({ storage });
+
+// ----------------------------
 // SOP routes
-router.get("/", sopController.getAllSops);      // Fetch all SOPs
-router.post("/", sopController.addSop);         // Add a new SOP
-router.put("/:sop_id", sopController.updateSop); // Update an SOP
-router.delete("/:sop_id", sopController.deleteSop); // Delete an SOP
+router.get("/", sopController.getAllSops);
+router.post("/", upload.single("file"), sopController.addSop); // 🧠 Updated line
+router.put("/:sop_id", sopController.updateSop);
+router.delete("/:sop_id", sopController.deleteSop);
 
+// ----------------------------
 // SOP category routes
 router.get("/category", sopController.getAllCategories);
 router.post("/category", sopController.addCategory);
+
+// ----------------------------
+// File routes (optional)
+router.post("/:sop_id/upload", upload.single("file"), sopController.uploadAttachment);
+router.get("/:sop_id/files", sopController.getSopFiles);
 
 module.exports = router;
