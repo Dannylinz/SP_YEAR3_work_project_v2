@@ -1,0 +1,581 @@
+L5SW2#show run
+Building configuration...
+
+Current configuration : 14786 bytes
+!
+version 12.2
+no service pad
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname L5SW2
+!
+boot-start-marker
+boot-end-marker
+!
+enable secret 5 $1$S3zd$Qk7xUE6lLzHY2VawijI4U.
+!
+username netstar privilege 15 secret 5 $1$Hu2N$V/gxfOTcF/Wtuzpc/pIWO0
+no aaa new-model
+system mtu routing 1500
+ip subnet-zero
+!
+!
+!
+mls qos map cos-dscp 0 8 16 26 32 46 48 56
+mls qos
+!
+crypto pki trustpoint TP-self-signed-551380736
+ enrollment selfsigned
+ subject-name cn=IOS-Self-Signed-Certificate-551380736
+ revocation-check none
+ rsakeypair TP-self-signed-551380736
+!
+!
+crypto pki certificate chain TP-self-signed-551380736
+ certificate self-signed 01
+  3082023C 308201A5 A0030201 02020101 300D0609 2A864886 F70D0101 04050030
+  30312E30 2C060355 04031325 494F532D 53656C66 2D536967 6E65642D 43657274
+  69666963 6174652D 35353133 38303733 36301E17 0D393330 33303130 31303333
+  385A170D 32303031 30313030 30303030 5A303031 2E302C06 03550403 1325494F
+  532D5365 6C662D53 69676E65 642D4365 72746966 69636174 652D3535 31333830
+  37333630 819F300D 06092A86 4886F70D 01010105 0003818D 00308189 02818100
+  BBA8486F F6CB621F 05DA9DFA 86AA0478 291C6C3C 4CC69FDD 3528F0D9 1E961F8C
+  7C1DA492 20DB36D5 044901C5 6C826232 05FF06D9 4246362F 9B3C18B8 740A5A62
+  098AB038 5ACB7EC1 871FA467 860EBBCC 70732B0B 33B630F0 9263F7A7 FFC3759D
+  9F860A83 C845C693 FF13FEBF 102E84BC 4D829E58 F8782351 399C294F B026FF9B
+  02030100 01A36630 64300F06 03551D13 0101FF04 05300301 01FF3011 0603551D
+  11040A30 0882064C 35535732 2E301F06 03551D23 04183016 801478B4 0DAC1781
+  C0EAA590 BAE48B6E 7A6C2C0C D0F7301D 0603551D 0E041604 1478B40D AC1781C0
+  EAA590BA E48B6E7A 6C2C0CD0 F7300D06 092A8648 86F70D01 01040500 03818100
+  58313D15 8150B606 D3B0E495 9FF26E2D 87CA5C23 13585199 75D82EA2 B5F44AE8
+  7DC95554 4F828941 B8BC79AF CCF156F2 964FED42 49558515 88995CB6 F954153C
+  C9197229 5FE08E5C 6E891FA7 43248A01 52749B75 1BC16D99 7D33073A EC228C3E
+  872F32C8 95B658BB 441BC787 3407299D 72534020 461FEAF3 83F17A98 7BDC98E4
+  quit
+!
+!
+!
+!
+!
+!
+spanning-tree mode pvst
+spanning-tree portfast bpdufilter default
+spanning-tree extend system-id
+spanning-tree uplinkfast
+spanning-tree backbonefast
+!
+vlan internal allocation policy ascending
+!
+!
+!
+interface FastEthernet0/1
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/2
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/3
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/4
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/5
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/6
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/7
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/8
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/9
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/10
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/11
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/12
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/13
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/14
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/15
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/16
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/17
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/18
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/19
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/20
+ description ***Port to AVAYA IP Phone***
+ switchport access vlan 502
+ switchport mode access
+ speed 100
+ duplex full
+ mls qos trust cos
+ no cdp enable
+ spanning-tree portfast
+!
+interface FastEthernet0/21
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/22
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/23
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/24
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/25
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/26
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/27
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/28
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/29
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/30
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/31
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/32
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/33
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/34
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/35
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/36
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/37
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/38
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/39
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/40
+ description ***Connected to AP***
+ switchport trunk native vlan 501
+ switchport trunk allowed vlan 10,15,100,501
+ switchport mode trunk
+!
+interface FastEthernet0/41
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/42
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/43
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/44
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/45
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/46
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/47
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface FastEthernet0/48
+ description ***Data Port***
+ switchport access vlan 501
+ switchport mode access
+ storm-control broadcast level 10.00
+ storm-control multicast level 10.00
+ storm-control action shutdown
+ spanning-tree portfast
+!
+interface GigabitEthernet0/1
+!
+interface GigabitEthernet0/2
+!
+interface GigabitEthernet0/3
+ description **Port to L5SW3**
+ switchport trunk allowed vlan 10,15,100,501,502
+ switchport mode trunk
+ mls qos trust dscp
+!
+interface GigabitEthernet0/4
+ description **Port to L5SW1**
+ switchport trunk allowed vlan 10,15,100,501,502
+ switchport mode trunk
+ mls qos trust dscp
+!
+interface Vlan1
+ no ip address
+ no ip route-cache
+ shutdown
+!
+interface Vlan100
+ description Management_IP
+ ip address 192.168.100.52 255.255.255.0
+ no ip route-cache
+!
+no ip http server
+no ip http secure-server
+!
+control-plane
+!
+banner login ^CCCCCCCCC
+****************************************************************************
+WARNING!!!
+This system is solely for the use of authorized users for official purposes.
+You have no expectation of privacy in its use and to ensure that the system
+is functioning properly, individuals using this computer system are subject
+to having all of their activities monitored and recorded by system
+personnel.  Use of this system evidences an express consent to such
+monitoring and agreement that if such monitoring reveals evidence of
+possible abuse or criminal activity, system personnel may provide the
+results of such monitoring to appropriate officials.
+****************************************************************************
+^C
+banner motd ^CCCCCCCC
+***********************************WARNING***********************************
+Unauthorized access to this router is unlawful and will be subject to civil
+and criminal penalties. Use of this system is being logged and can be used in
+any legal proceedings.
+****************************************************************************^C
+!
+line con 0
+line vty 0 4
+ login local
+ transport input ssh
+line vty 5 15
+ login
+ transport input ssh
+!
+end
