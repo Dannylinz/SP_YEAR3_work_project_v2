@@ -18,8 +18,8 @@ const upload = multer({ storage });
 // ----------------------------
 // SOP routes
 router.get("/", sopController.getAllSops);
-router.post("/", upload.single("file"), sopController.addSop); // 🧠 Updated line
-router.put("/:sop_id", sopController.updateSop);
+router.post("/", upload.single("file"), sopController.addSop);
+router.put("/:sop_id", upload.single("file"), sopController.updateSop); // 🔹 Added multer
 router.delete("/:sop_id", sopController.deleteSop);
 
 // ----------------------------
@@ -28,7 +28,7 @@ router.get("/category", sopController.getAllCategories);
 router.post("/category", sopController.addCategory);
 
 // ----------------------------
-// File routes (optional)
+// File routes
 router.post("/:sop_id/upload", upload.single("file"), sopController.uploadAttachment);
 router.get("/:sop_id/files", sopController.getSopFiles);
 

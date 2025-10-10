@@ -92,13 +92,53 @@
     </div>
   </div>
 
+  <!-- ---------------- Edit SOP Modal ---------------- -->
+  <div class="modal fade" id="editSopModal" tabindex="-1" aria-labelledby="editSopModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <form id="editSopForm" enctype="multipart/form-data">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editSopModalLabel">Edit SOP</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="edit_sop_id" />
+            <div class="mb-3">
+              <label for="edit_sop_title" class="form-label">Title</label>
+              <input type="text" id="edit_sop_title" class="form-control" required />
+            </div>
+            <div class="mb-3">
+              <label for="edit_sop_description" class="form-label">Description</label>
+              <textarea id="edit_sop_description" class="form-control" rows="3" required></textarea>
+            </div>
+            <div class="mb-3">
+              <label for="edit_sop_category" class="form-label">Category</label>
+              <select id="edit_sop_category" class="form-select" required>
+                <option value="">Select Category</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="edit_sop_file" class="form-label">File (replace if needed)</label>
+              <input type="file" id="edit_sop_file" class="form-control" />
+              <div id="current_file" class="form-text"></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
     const API_BASE = "http://localhost:3000/api/sops";
+    let sopsCache = [];
 
     document.addEventListener("DOMContentLoaded", () => {
-      // ✅ Get the real logged-in user from localStorage
       const user = JSON.parse(localStorage.getItem("user"));
       if (!user || !user.user_id) {
         alert("Please log in first!");
@@ -135,6 +175,7 @@
         try {
           const res = await fetch(API_BASE);
           const sops = await res.json();
+          sopsCache = sops; // Cache for editing
 
           sopList.innerHTML = "";
           if (sops.length === 0) {
@@ -155,8 +196,7 @@
               ? `
                 <button class="btn btn-sm btn-warning me-2 edit-sop" data-id="${sop.sop_id}">Edit</button>
                 <button class="btn btn-sm btn-danger delete-sop" data-id="${sop.sop_id}">Delete</button>
-              `
-              : "";
+              ` : "";
 
             const sopCard = document.createElement("div");
             sopCard.classList.add("card", "mb-3");
@@ -226,7 +266,7 @@
         formData.append("title", title);
         formData.append("content", desc);
         formData.append("category_id", categoryId);
-        formData.append("created_by_user_id", user.user_id); // ✅ real logged-in user
+        formData.append("created_by_user_id", user.user_id);
         if (file) formData.append("file", file);
 
         try {
@@ -255,8 +295,71 @@
       }
 
       // ---------------- Edit SOP ----------------
-      function editSop(sopId) {
-        alert("Edit SOP feature can be implemented here (modal with prefilled fields).");
+      async function editSop(sopId) {
+        const sop = sopsCache.find(s => s.sop_id == sopId);
+        if (!sop) return alert("SOP not found!");
+
+        // Fill modal
+        document.getElementById("edit_sop_id").value = sop.sop_id;
+        document.getElementById("edit_sop_title").value = sop.title;
+        document.getElementById("edit_sop_description").value = sop.content;
+
+        const categorySelectModal = document.getElementById("edit_sop_category");
+        categorySelectModal.innerHTML = `<option value="">Select Category</option>`;
+        const resCat = await fetch(`${API_BASE}/category`);
+        const categories = await resCat.json();
+        categories.forEach(cat => {
+          const option = document.createElement("option");
+          option.value = cat.category_id;
+          option.textContent = cat.category_name;
+          if (sop.category_id == cat.category_id) option.selected = true;
+          categorySelectModal.appendChild(option);
+        });
+
+        const currentFileDiv = document.getElementById("current_file");
+        if (sop.attachments && sop.attachments.length > 0) {
+          currentFileDiv.innerHTML = `Current file: <a href="http://localhost:3000/${sop.attachments[0].file_path}" target="_blank">${sop.attachments[0].file_name}</a>`;
+        } else {
+          currentFileDiv.textContent = "No current file";
+        }
+
+        const editModal = new bootstrap.Modal(document.getElementById("editSopModal"));
+        editModal.show();
+
+        document.getElementById("editSopForm").onsubmit = async (e) => {
+          e.preventDefault();
+
+          const formData = new FormData();
+          formData.append("title", document.getElementById("edit_sop_title").value.trim());
+          formData.append("content", document.getElementById("edit_sop_description").value.trim());
+          formData.append("category_id", document.getElementById("edit_sop_category").value);
+
+          const file = document.getElementById("edit_sop_file").files[0];
+          if (file) formData.append("file", file);
+
+          console.log("📤 Updating SOP:", {
+            sopId: sop.sop_id,
+            title: formData.get("title"),
+            content: formData.get("content"),
+            category_id: formData.get("category_id"),
+            file: file ? file.name : "No file"
+          });
+
+          try {
+            const res = await fetch(`${API_BASE}/${sop.sop_id}`, { method: "PUT", body: formData });
+            if (res.ok) {
+              alert("✅ SOP updated successfully!");
+              loadSOPs();
+              editModal.hide();
+            } else {
+              console.error("❌ Update failed:", await res.text());
+              alert("Failed to update SOP.");
+            }
+          } catch (err) {
+            console.error("❌ Error updating SOP:", err);
+            alert("Error updating SOP.");
+          }
+        };
       }
 
       // ---------------- Initial Load ----------------
