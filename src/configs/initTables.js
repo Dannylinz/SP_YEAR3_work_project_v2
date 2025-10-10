@@ -82,32 +82,14 @@ const pool = require("../services/db");
         effective_date DATE,
         created_by_user_id INT,
         status ENUM('draft','published','archived') DEFAULT 'draft',
-        department_id INT
+        department_id INT,
+        category_id INT,
+        FOREIGN KEY (created_by_user_id) REFERENCES User(user_id),
+        FOREIGN KEY (department_id) REFERENCES Department(department_id),
+        FOREIGN KEY (category_id) REFERENCES SOPCategory(category_id)
       );
     `);
-    console.log("✅ Table 'SOP' created (without category_id for now)");
-
-    // Add category_id column if not exists
-    await pool.query(`
-      ALTER TABLE SOP
-      ADD COLUMN IF NOT EXISTS category_id INT AFTER department_id
-    `);
-    console.log("✅ Ensured 'category_id' column exists on SOP table");
-
-    // Add foreign key for category_id
-    try {
-      await pool.query(`
-        ALTER TABLE SOP
-        ADD CONSTRAINT fk_sop_category FOREIGN KEY (category_id) REFERENCES SOPCategory(category_id)
-      `);
-      console.log("✅ Foreign key 'fk_sop_category' added to SOP table");
-    } catch (err) {
-      if (err.code === "ER_DUP_KEYNAME") {
-        console.log("⚠ Foreign key 'fk_sop_category' already exists, skipping");
-      } else {
-        throw err;
-      }
-    }
+    console.log("✅ Table 'SOP' created with all foreign keys");
 
     // Procedure Table
     await pool.query(`
