@@ -1,44 +1,189 @@
 <!DOCTYPE html>
-<html>
-<head><title>FAQ</title></head>
-<body>
-<h2>FAQ</h2>
-<a href="index.html">Dashboard</a>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAQ Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
 
-<ul id="faqList"></ul>
+  <div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2 class="fw-bold text-primary">Frequently Asked Questions</h2>
+      <a href="index.html" class="btn btn-outline-secondary">← Dashboard</a>
+    </div>
 
-<form id="addFaqForm">
-  <input type="text" id="question" placeholder="Question" required>
-  <input type="text" id="answer" placeholder="Answer" required>
-  <button type="submit">Add FAQ</button>
-</form>
+    <!-- FAQ List -->
+    <div id="faqList" class="mb-5"></div>
 
-<script>
-async function loadFaqs() {
-  const res = await fetch("/api/faqs");
-  const data = await res.json();
-  const list = document.getElementById("faqList");
-  list.innerHTML = "";
-  data.forEach(f => {
-    const li = document.createElement("li");
-    li.textContent = f.question + " - " + f.answer;
-    list.appendChild(li);
-  });
-}
-document.getElementById("addFaqForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  const question = document.getElementById("question").value;
-  const answer = document.getElementById("answer").value;
-  const res = await fetch("/api/faqs", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({question, answer})
-  });
-  const data = await res.json();
-  alert(data.message);
-  loadFaqs();
-});
-loadFaqs();
-</script>
+    <!-- Add FAQ Form -->
+    <div class="card shadow-sm p-4">
+      <h4 class="mb-3 text-secondary">Add New FAQ</h4>
+      <form id="addFaqForm" class="row g-3">
+        <div class="col-md-6">
+          <input type="text" id="question" class="form-control" placeholder="Enter your question" required>
+        </div>
+        <div class="col-md-6">
+          <input type="text" id="answer" class="form-control" placeholder="Enter the answer" required>
+        </div>
+        <div class="col-12 text-end">
+          <button type="submit" class="btn btn-primary px-4">Add FAQ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="modal fade" id="editFaqModal" tabindex="-1" aria-labelledby="editFaqModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="editFaqForm">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editFaqModalLabel">Edit FAQ</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="editFaqId">
+            <div class="mb-3">
+              <label for="editQuestion" class="form-label">Question</label>
+              <input type="text" id="editQuestion" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label for="editAnswer" class="form-label">Answer</label>
+              <input type="text" id="editAnswer" class="form-control" required>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-success">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const faqList = document.getElementById("faqList");
+    const editFaqModal = new bootstrap.Modal(document.getElementById("editFaqModal"));
+
+    async function loadFaqs() {
+      try {
+        const res = await fetch("/api/faqs");
+        const data = await res.json();
+        faqList.innerHTML = "";
+
+        if (!Array.isArray(data) || data.length === 0) {
+          faqList.innerHTML = '<div class="text-center text-muted">No FAQs available yet.</div>';
+          return;
+        }
+
+        data.forEach(f => {
+          const card = document.createElement("div");
+          card.className = "card mb-3 shadow-sm";
+          card.innerHTML = `
+            <div class="card-body">
+              <h5 class="card-title text-primary">${f.question}</h5>
+              <p class="card-text text-secondary">${f.answer}</p>
+              <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-sm btn-warning edit-faq" data-id="${f.id}" data-question="${f.question}" data-answer="${f.answer}">Edit</button>
+                <button class="btn btn-sm btn-danger delete-faq" data-id="${f.id}">Delete</button>
+              </div>
+            </div>
+          `;
+          faqList.appendChild(card);
+        });
+
+        // Attach edit event listeners
+        document.querySelectorAll(".edit-faq").forEach(btn => {
+          btn.addEventListener("click", () => {
+            document.getElementById("editFaqId").value = btn.dataset.id;
+            document.getElementById("editQuestion").value = btn.dataset.question;
+            document.getElementById("editAnswer").value = btn.dataset.answer;
+            editFaqModal.show();
+          });
+        });
+
+        // Attach delete event listeners
+        document.querySelectorAll(".delete-faq").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            if (confirm("Are you sure you want to delete this FAQ?")) {
+              await deleteFaq(btn.dataset.id);
+            }
+          });
+        });
+
+      } catch (error) {
+        console.error("Error loading FAQs:", error);
+      }
+    }
+
+    // Add new FAQ
+    document.getElementById("addFaqForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const question = document.getElementById("question").value.trim();
+      const answer = document.getElementById("answer").value.trim();
+
+      if (!question || !answer) {
+        alert("Please fill in both fields.");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/faqs", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ question, answer })
+        });
+        const data = await res.json();
+        alert(data.message || "FAQ added successfully!");
+        document.getElementById("addFaqForm").reset();
+        loadFaqs();
+      } catch (error) {
+        console.error("Error adding FAQ:", error);
+        alert("Something went wrong. Please try again.");
+      }
+    });
+
+    // Edit FAQ
+    document.getElementById("editFaqForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const id = document.getElementById("editFaqId").value;
+      const question = document.getElementById("editQuestion").value.trim();
+      const answer = document.getElementById("editAnswer").value.trim();
+
+      try {
+        const res = await fetch(`/api/faqs/${id}`, {
+          method: "PUT",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ question, answer })
+        });
+        const data = await res.json();
+        alert(data.message || "FAQ updated successfully!");
+        editFaqModal.hide();
+        loadFaqs();
+      } catch (error) {
+        console.error("Error updating FAQ:", error);
+        alert("Failed to update FAQ. Please try again.");
+      }
+    });
+
+    // Delete FAQ
+    async function deleteFaq(id) {
+      try {
+        const res = await fetch(`/api/faqs/${id}`, { method: "DELETE" });
+        const data = await res.json();
+        alert(data.message || "FAQ deleted successfully!");
+        loadFaqs();
+      } catch (error) {
+        console.error("Error deleting FAQ:", error);
+        alert("Failed to delete FAQ. Please try again.");
+      }
+    }
+
+    // Initial load
+    loadFaqs();
+  </script>
 </body>
 </html>
