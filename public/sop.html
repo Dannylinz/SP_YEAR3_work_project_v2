@@ -17,24 +17,12 @@
       </button>
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item">
-            <a class="nav-link active" href="sop.html">SOP Management</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="index.html">Dashboard</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="faq.html">FAQ</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="projects.html">Projects</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="profile.html">Profile</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="login.html">Logout</a>
-          </li>
+          <li class="nav-item"><a class="nav-link active" href="sop.html">SOP Management</a></li>
+          <li class="nav-item"><a class="nav-link" href="index.html">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="faq.html">FAQ</a></li>
+          <li class="nav-item"><a class="nav-link" href="projects.html">Projects</a></li>
+          <li class="nav-item"><a class="nav-link" href="profile.html">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" href="login.html">Logout</a></li>
         </ul>
       </div>
     </div>
@@ -87,7 +75,15 @@
 
     <!-- SOP List -->
     <div class="card">
-      <div class="card-header">All SOPs</div>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>All SOPs</span>
+        <div class="d-flex align-items-center">
+          <label for="filterCategory" class="me-2 fw-bold text-secondary">Filter by Category:</label>
+          <select id="filterCategory" class="form-select form-select-sm" style="width: 220px;">
+            <option value="all">All Categories</option>
+          </select>
+        </div>
+      </div>
       <div class="card-body" id="sopList">
         <p class="text-muted">Loading SOPs...</p>
       </div>
@@ -139,6 +135,7 @@
   <script>
     const API_BASE = "http://localhost:3000/api/sops";
     let sopsCache = [];
+    let categoriesCache = [];
 
     document.addEventListener("DOMContentLoaded", () => {
       const user = JSON.parse(localStorage.getItem("user"));
@@ -154,18 +151,21 @@
       const sopForm = document.getElementById("sopForm");
       const categorySelect = document.getElementById("sop_category");
       const sopList = document.getElementById("sopList");
+      const filterCategory = document.getElementById("filterCategory");
 
       // ---------------- Load Categories ----------------
       async function loadCategories() {
         try {
           const res = await fetch(`${API_BASE}/category`);
           const data = await res.json();
+          categoriesCache = data;
+
           categorySelect.innerHTML = `<option value="">Select Category</option>`;
+          filterCategory.innerHTML = `<option value="all">All Categories</option>`;
+
           data.forEach(cat => {
-            const option = document.createElement("option");
-            option.value = cat.category_id;
-            option.textContent = cat.category_name;
-            categorySelect.appendChild(option);
+            categorySelect.insertAdjacentHTML("beforeend", `<option value="${cat.category_id}">${cat.category_name}</option>`);
+            filterCategory.insertAdjacentHTML("beforeend", `<option value="${cat.category_id}">${cat.category_name}</option>`);
           });
         } catch (err) {
           console.error("Error loading categories:", err);
@@ -177,32 +177,43 @@
         try {
           const res = await fetch(API_BASE);
           const sops = await res.json();
-          sopsCache = sops; // Cache for editing
+          sopsCache = sops;
+          renderSOPs();
+        } catch (err) {
+          console.error("Error loading SOPs:", err);
+          sopList.innerHTML = "<p class='text-danger'>Failed to load SOPs.</p>";
+        }
+      }
 
-          sopList.innerHTML = "";
-          if (sops.length === 0) {
-            sopList.innerHTML = "<p class='text-muted'>No SOPs available.</p>";
-            return;
-          }
+      // ---------------- Render SOPs ----------------
+      function renderSOPs() {
+        const selectedCategory = filterCategory.value;
+        sopList.innerHTML = "";
 
-          sops.forEach(sop => {
-            const attachmentsHTML = sop.attachments && sop.attachments.length > 0
-              ? sop.attachments.map(att => `
-                  <a href="http://localhost:3000/${att.file_path}" target="_blank" class="d-block">
-                    📎 ${att.file_name} (View / Download)
-                  </a>
-                `).join("")
-              : "<em>No attachments</em>";
+        const filteredSops = selectedCategory === "all"
+          ? sopsCache
+          : sopsCache.filter(s => String(s.category_id) === selectedCategory);
 
-            const actionsHTML = sop.created_by_user_id === user.user_id
-              ? `
-                <button class="btn btn-sm btn-warning me-2 edit-sop" data-id="${sop.sop_id}">Edit</button>
-                <button class="btn btn-sm btn-danger delete-sop" data-id="${sop.sop_id}">Delete</button>
-              ` : "";
+        if (filteredSops.length === 0) {
+          sopList.innerHTML = "<p class='text-muted'>No SOPs available for this category.</p>";
+          return;
+        }
 
-            const sopCard = document.createElement("div");
-            sopCard.classList.add("card", "mb-3");
-            sopCard.innerHTML = `
+        filteredSops.forEach(sop => {
+          const attachmentsHTML = sop.attachments?.length
+            ? sop.attachments.map(att => `
+                <a href="http://localhost:3000/${att.file_path}" target="_blank" class="d-block">
+                  📎 ${att.file_name}
+                </a>`).join("")
+            : "<em>No attachments</em>";
+
+          const actionsHTML = sop.created_by_user_id === user.user_id
+            ? `<button class="btn btn-sm btn-warning me-2 edit-sop" data-id="${sop.sop_id}">Edit</button>
+               <button class="btn btn-sm btn-danger delete-sop" data-id="${sop.sop_id}">Delete</button>`
+            : "";
+
+          sopList.insertAdjacentHTML("beforeend", `
+            <div class="card mb-3">
               <div class="card-body">
                 <h5 class="card-title">${sop.title}</h5>
                 <p class="card-text">${sop.content}</p>
@@ -211,155 +222,104 @@
                 <div><strong>Attachments:</strong><br>${attachmentsHTML}</div>
                 <div class="mt-2">${actionsHTML}</div>
               </div>
-            `;
-            sopList.appendChild(sopCard);
-          });
+            </div>
+          `);
+        });
 
-          document.querySelectorAll(".delete-sop").forEach(btn => {
-            btn.addEventListener("click", () => deleteSop(btn.dataset.id));
-          });
-          document.querySelectorAll(".edit-sop").forEach(btn => {
-            btn.addEventListener("click", () => editSop(btn.dataset.id));
-          });
-
-        } catch (err) {
-          console.error("Error loading SOPs:", err);
-          sopList.innerHTML = "<p class='text-danger'>Failed to load SOPs.</p>";
-        }
+        document.querySelectorAll(".delete-sop").forEach(btn => {
+          btn.addEventListener("click", () => deleteSop(btn.dataset.id));
+        });
+        document.querySelectorAll(".edit-sop").forEach(btn => {
+          btn.addEventListener("click", () => editSop(btn.dataset.id));
+        });
       }
+
+      // ---------------- Category Filter ----------------
+      filterCategory.addEventListener("change", renderSOPs);
 
       // ---------------- Add Category ----------------
       categoryForm.addEventListener("submit", async e => {
         e.preventDefault();
-        const categoryName = document.getElementById("category_name").value.trim();
-        if (!categoryName) return alert("Please enter a category name.");
-
-        try {
-          const res = await fetch(`${API_BASE}/category`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ category_name: categoryName }),
-          });
-          if (res.ok) {
-            categoryForm.reset();
-            loadCategories();
-          } else {
-            console.error("Error adding category:", await res.text());
-          }
-        } catch (err) {
-          console.error("Error adding category:", err);
-        }
+        const name = document.getElementById("category_name").value.trim();
+        if (!name) return alert("Please enter a category name.");
+        await fetch(`${API_BASE}/category`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({category_name: name}) });
+        categoryForm.reset();
+        loadCategories();
       });
 
       // ---------------- Add SOP ----------------
       sopForm.addEventListener("submit", async e => {
         e.preventDefault();
-        const title = document.getElementById("sop_title").value.trim();
-        const desc = document.getElementById("sop_description").value.trim();
-        const categoryId = document.getElementById("sop_category").value;
-        const file = document.getElementById("sop_file").files[0];
-
-        if (!title || !desc || !categoryId) {
-          alert("Please fill in all required fields.");
-          return;
-        }
-
+        const title = sop_title.value.trim(), desc = sop_description.value.trim(), catId = sop_category.value;
+        const file = sop_file.files[0];
+        if (!title || !desc || !catId) return alert("Fill all fields!");
         const formData = new FormData();
         formData.append("title", title);
         formData.append("content", desc);
-        formData.append("category_id", categoryId);
+        formData.append("category_id", catId);
         formData.append("created_by_user_id", user.user_id);
         if (file) formData.append("file", file);
-
-        try {
-          const res = await fetch(API_BASE, { method: "POST", body: formData });
-          if (res.ok) {
-            sopForm.reset();
-            loadSOPs();
-          } else {
-            console.error("Error adding SOP:", await res.text());
-          }
-        } catch (err) {
-          console.error("Error submitting SOP:", err);
-        }
+        await fetch(API_BASE, { method: "POST", body: formData });
+        sopForm.reset();
+        loadSOPs();
       });
 
       // ---------------- Delete SOP ----------------
-      async function deleteSop(sopId) {
+      async function deleteSop(id) {
         if (!confirm("Are you sure you want to delete this SOP?")) return;
-        try {
-          const res = await fetch(`${API_BASE}/${sopId}`, { method: "DELETE" });
-          if (res.ok) loadSOPs();
-          else console.error("Error deleting SOP:", await res.text());
-        } catch (err) {
-          console.error("Error deleting SOP:", err);
-        }
+        await fetch(`${API_BASE}/${id}`, { method: "DELETE" });
+        loadSOPs();
       }
 
-      // ---------------- Edit SOP ----------------
+      // ---------------- EDIT SOP (fully integrated) ----------------
       async function editSop(sopId) {
+        console.log("🟡 Edit SOP clicked:", sopId);
         const sop = sopsCache.find(s => s.sop_id == sopId);
         if (!sop) return alert("SOP not found!");
 
-        // Fill modal
-        document.getElementById("edit_sop_id").value = sop.sop_id;
-        document.getElementById("edit_sop_title").value = sop.title;
-        document.getElementById("edit_sop_description").value = sop.content;
+        edit_sop_id.value = sop.sop_id;
+        edit_sop_title.value = sop.title || "";
+        edit_sop_description.value = sop.content || "";
 
-        const categorySelectModal = document.getElementById("edit_sop_category");
-        categorySelectModal.innerHTML = `<option value="">Select Category</option>`;
-        const resCat = await fetch(`${API_BASE}/category`);
-        const categories = await resCat.json();
-        categories.forEach(cat => {
-          const option = document.createElement("option");
-          option.value = cat.category_id;
-          option.textContent = cat.category_name;
-          if (sop.category_id == cat.category_id) option.selected = true;
-          categorySelectModal.appendChild(option);
+        // Populate categories in modal
+        const catSelect = document.getElementById("edit_sop_category");
+        catSelect.innerHTML = `<option value="">Select Category</option>`;
+        categoriesCache.forEach(cat => {
+          catSelect.insertAdjacentHTML("beforeend", `
+            <option value="${cat.category_id}" ${cat.category_id == sop.category_id ? "selected" : ""}>
+              ${cat.category_name}
+            </option>
+          `);
         });
 
-        const currentFileDiv = document.getElementById("current_file");
-        if (sop.attachments && sop.attachments.length > 0) {
-          currentFileDiv.innerHTML = `Current file: <a href="http://localhost:3000/${sop.attachments[0].file_path}" target="_blank">${sop.attachments[0].file_name}</a>`;
-        } else {
-          currentFileDiv.textContent = "No current file";
-        }
+        // Show current file
+        current_file.innerHTML = sop.attachments?.length
+          ? `<a href="http://localhost:3000/${sop.attachments[0].file_path}" target="_blank">${sop.attachments[0].file_name}</a>`
+          : "No current file";
 
-        const editModal = new bootstrap.Modal(document.getElementById("editSopModal"));
-        editModal.show();
+        const modal = new bootstrap.Modal(document.getElementById("editSopModal"));
+        modal.show();
 
-        document.getElementById("editSopForm").onsubmit = async (e) => {
+        editSopForm.onsubmit = async (e) => {
           e.preventDefault();
-
           const formData = new FormData();
-          formData.append("title", document.getElementById("edit_sop_title").value.trim());
-          formData.append("content", document.getElementById("edit_sop_description").value.trim());
-          formData.append("category_id", document.getElementById("edit_sop_category").value);
-
-          const file = document.getElementById("edit_sop_file").files[0];
+          const file = edit_sop_file.files[0];
+          formData.append("title", edit_sop_title.value.trim());
+          formData.append("content", edit_sop_description.value.trim());
+          formData.append("category_id", edit_sop_category.value);
           if (file) formData.append("file", file);
 
-          console.log("📤 Updating SOP:", {
-            sopId: sop.sop_id,
-            title: formData.get("title"),
-            content: formData.get("content"),
-            category_id: formData.get("category_id"),
-            file: file ? file.name : "No file"
-          });
+          console.log("📤 Updating SOP:", { sopId, formData });
 
-          try {
-            const res = await fetch(`${API_BASE}/${sop.sop_id}`, { method: "PUT", body: formData });
-            if (res.ok) {
-              alert("✅ SOP updated successfully!");
-              loadSOPs();
-              editModal.hide();
-            } else {
-              console.error("❌ Update failed:", await res.text());
-              alert("Failed to update SOP.");
-            }
-          } catch (err) {
-            console.error("❌ Error updating SOP:", err);
-            alert("Error updating SOP.");
+          const res = await fetch(`${API_BASE}/${sopId}`, { method: "PUT", body: formData });
+          const txt = await res.text();
+          console.log("📬 Update Response:", txt);
+          if (res.ok) {
+            alert("✅ SOP updated successfully!");
+            modal.hide();
+            loadSOPs();
+          } else {
+            alert("❌ Failed to update SOP. Check console.");
           }
         };
       }
