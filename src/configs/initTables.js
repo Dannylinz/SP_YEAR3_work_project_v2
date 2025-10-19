@@ -48,7 +48,7 @@ const pool = require("../services/db");
         email VARCHAR(255) NOT NULL UNIQUE,
         full_name VARCHAR(255),
         password VARCHAR(255),
-        role_id INT DEFAULT 1, -- Default to Admin
+        role_id INT DEFAULT 1,
         department_id INT,
         created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         active BOOLEAN DEFAULT TRUE,
@@ -59,21 +59,21 @@ const pool = require("../services/db");
     console.log("✅ Table 'User' created with Role & Department relationships");
 
     // ----------------------------
-    // FAQ Table
+    // FAQ Table (Chat Board + FAQ hybrid)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS FAQ (
         faq_id INT AUTO_INCREMENT PRIMARY KEY,
         question TEXT,
-        answer TEXT,
-        category VARCHAR(100),
+        username VARCHAR(100), -- ✅ Added username for chat messages
         created_by_user_id INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         tags VARCHAR(255),
         is_published BOOLEAN DEFAULT FALSE,
         FOREIGN KEY (created_by_user_id) REFERENCES User(user_id)
       );
     `);
-    console.log("✅ Table 'FAQ' created");
+    console.log("✅ Table 'FAQ' created (with username & chat compatibility)");
 
     // ----------------------------
     // SOP Category Table

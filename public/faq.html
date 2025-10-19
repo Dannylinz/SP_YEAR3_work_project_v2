@@ -1,189 +1,227 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FAQ Management</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meganet Chat Board 💬</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background: #f4f6f9;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .chat-container {
+      max-width: 800px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 15px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      padding: 25px;
+    }
+
+    .message {
+      background: #f1f3f6;
+      border-radius: 10px;
+      padding: 10px 15px;
+      margin-bottom: 10px;
+    }
+
+    .message-owner {
+      background: #d0ebff;
+    }
+
+    .message-header {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .search-box {
+      margin-bottom: 20px;
+    }
+
+    .btn-sm {
+      font-size: 0.8rem;
+    }
+  </style>
 </head>
-<body class="bg-light">
-
-  <div class="container py-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h2 class="fw-bold text-primary">Frequently Asked Questions</h2>
-      <a href="index.html" class="btn btn-outline-secondary">← Dashboard</a>
+<body>
+  <div class="chat-container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="text-primary fw-bold">💬 Meganet Chat Board</h4>
+      <a href="index.html" class="btn btn-outline-secondary btn-sm">← Back</a>
     </div>
 
-    <!-- FAQ List -->
-    <div id="faqList" class="mb-5"></div>
+    <!-- Search Bar -->
+    <input type="text" id="searchInput" class="form-control search-box" placeholder="🔍 Search messages..." />
 
-    <!-- Add FAQ Form -->
-    <div class="card shadow-sm p-4">
-      <h4 class="mb-3 text-secondary">Add New FAQ</h4>
-      <form id="addFaqForm" class="row g-3">
-        <div class="col-md-6">
-          <input type="text" id="question" class="form-control" placeholder="Enter your question" required>
-        </div>
-        <div class="col-md-6">
-          <input type="text" id="answer" class="form-control" placeholder="Enter the answer" required>
-        </div>
-        <div class="col-12 text-end">
-          <button type="submit" class="btn btn-primary px-4">Add FAQ</button>
-        </div>
-      </form>
-    </div>
+    <!-- Chat Messages -->
+    <div id="chatMessages" class="mb-4" style="max-height: 400px; overflow-y: auto;"></div>
+
+    <!-- Message Form -->
+    <form id="messageForm" class="d-flex gap-2">
+      <input type="text" id="messageInput" class="form-control" placeholder="Type your message..." required />
+      <button type="submit" class="btn btn-primary">Send</button>
+    </form>
   </div>
 
   <!-- Edit Modal -->
-  <div class="modal fade" id="editFaqModal" tabindex="-1" aria-labelledby="editFaqModalLabel" aria-hidden="true">
+  <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
-        <form id="editFaqForm">
-          <div class="modal-header">
-            <h5 class="modal-title" id="editFaqModalLabel">Edit FAQ</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="editFaqId">
-            <div class="mb-3">
-              <label for="editQuestion" class="form-label">Question</label>
-              <input type="text" id="editQuestion" class="form-control" required>
-            </div>
-            <div class="mb-3">
-              <label for="editAnswer" class="form-label">Answer</label>
-              <input type="text" id="editAnswer" class="form-control" required>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-success">Save Changes</button>
-          </div>
-        </form>
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Message</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <textarea id="editMessageText" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button id="saveEditBtn" class="btn btn-success">Save</button>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
   <script>
-    const faqList = document.getElementById("faqList");
-    const editFaqModal = new bootstrap.Modal(document.getElementById("editFaqModal"));
+    const user = JSON.parse(localStorage.getItem("user"));
+    if (!user) {
+      window.location.href = "login.html";
+    }
 
-    async function loadFaqs() {
+    const chatBox = document.getElementById("chatMessages");
+    const messageForm = document.getElementById("messageForm");
+    const searchInput = document.getElementById("searchInput");
+    const editModal = new bootstrap.Modal(document.getElementById("editModal"));
+    const editMessageText = document.getElementById("editMessageText");
+    let editId = null;
+
+    // 🧭 Load all messages (optional search)
+    async function loadMessages(search = "") {
       try {
-        const res = await fetch("/api/faqs");
+        const res = await fetch(`/api/faqs?search=${encodeURIComponent(search)}`);
         const data = await res.json();
-        faqList.innerHTML = "";
 
+        chatBox.innerHTML = "";
         if (!Array.isArray(data) || data.length === 0) {
-          faqList.innerHTML = '<div class="text-center text-muted">No FAQs available yet.</div>';
+          chatBox.innerHTML = `<div class="text-center text-muted my-3">No messages yet.</div>`;
           return;
         }
 
-        data.forEach(f => {
-          const card = document.createElement("div");
-          card.className = "card mb-3 shadow-sm";
-          card.innerHTML = `
-            <div class="card-body">
-              <h5 class="card-title text-primary">${f.question}</h5>
-              <p class="card-text text-secondary">${f.answer}</p>
-              <div class="d-flex justify-content-end gap-2">
-                <button class="btn btn-sm btn-warning edit-faq" data-id="${f.id}" data-question="${f.question}" data-answer="${f.answer}">Edit</button>
-                <button class="btn btn-sm btn-danger delete-faq" data-id="${f.id}">Delete</button>
+        data.forEach(msg => {
+          const isOwner = msg.created_by_user_id === user.user_id;
+          const isAdmin = user.role_id === 1;
+          const messageDiv = document.createElement("div");
+          messageDiv.className = `message ${isOwner ? "message-owner" : ""}`;
+
+          const safeText = escapeHtml(msg.question);
+          const sender = escapeHtml(msg.username || "User");
+
+          messageDiv.innerHTML = `
+            <div class="message-header d-flex justify-content-between align-items-center">
+              <span>${sender}</span>
+              <div>
+                ${(isOwner || isAdmin) ? `
+                  <button class="btn btn-sm btn-warning edit-btn" data-id="${msg.faq_id}" data-text="${safeText}">✏️</button>
+                  <button class="btn btn-sm btn-danger delete-btn" data-id="${msg.faq_id}">🗑️</button>
+                ` : ""}
               </div>
             </div>
+            <div>${safeText}</div>
           `;
-          faqList.appendChild(card);
+          chatBox.appendChild(messageDiv);
         });
 
-        // Attach edit event listeners
-        document.querySelectorAll(".edit-faq").forEach(btn => {
-          btn.addEventListener("click", () => {
-            document.getElementById("editFaqId").value = btn.dataset.id;
-            document.getElementById("editQuestion").value = btn.dataset.question;
-            document.getElementById("editAnswer").value = btn.dataset.answer;
-            editFaqModal.show();
-          });
-        });
-
-        // Attach delete event listeners
-        document.querySelectorAll(".delete-faq").forEach(btn => {
-          btn.addEventListener("click", async () => {
-            if (confirm("Are you sure you want to delete this FAQ?")) {
-              await deleteFaq(btn.dataset.id);
-            }
-          });
-        });
-
-      } catch (error) {
-        console.error("Error loading FAQs:", error);
+        attachEventListeners();
+      } catch (err) {
+        console.error("Error loading messages:", err);
+        chatBox.innerHTML = `<div class="alert alert-danger">Failed to load messages.</div>`;
       }
     }
 
-    // Add new FAQ
-    document.getElementById("addFaqForm").addEventListener("submit", async e => {
-      e.preventDefault();
-      const question = document.getElementById("question").value.trim();
-      const answer = document.getElementById("answer").value.trim();
+    // ✏️ Attach edit/delete event listeners
+    function attachEventListeners() {
+      document.querySelectorAll(".edit-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          editId = btn.dataset.id;
+          editMessageText.value = btn.dataset.text;
+          editModal.show();
+        });
+      });
 
-      if (!question || !answer) {
-        alert("Please fill in both fields.");
-        return;
-      }
+      document.querySelectorAll(".delete-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          if (confirm("Delete this message?")) {
+            await fetch(`/api/faqs/${btn.dataset.id}`, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ user_id: user.user_id, role_id: user.role_id })
+            });
+            loadMessages();
+          }
+        });
+      });
+    }
+
+    // ➕ Add message
+    messageForm.addEventListener("submit", async e => {
+      e.preventDefault();
+      const text = document.getElementById("messageInput").value.trim();
+      if (!text) return;
 
       try {
-        const res = await fetch("/api/faqs", {
+        await fetch("/api/faqs", {
           method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ question, answer })
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: text, user_id: user.user_id, username: user.username })
         });
-        const data = await res.json();
-        alert(data.message || "FAQ added successfully!");
-        document.getElementById("addFaqForm").reset();
-        loadFaqs();
-      } catch (error) {
-        console.error("Error adding FAQ:", error);
-        alert("Something went wrong. Please try again.");
+        messageForm.reset();
+        loadMessages();
+      } catch (err) {
+        console.error("Failed to send message:", err);
       }
     });
 
-    // Edit FAQ
-    document.getElementById("editFaqForm").addEventListener("submit", async e => {
-      e.preventDefault();
-      const id = document.getElementById("editFaqId").value;
-      const question = document.getElementById("editQuestion").value.trim();
-      const answer = document.getElementById("editAnswer").value.trim();
+    // 💾 Save edited message
+    document.getElementById("saveEditBtn").addEventListener("click", async () => {
+      const newText = editMessageText.value.trim();
+      if (!newText) return;
 
       try {
-        const res = await fetch(`/api/faqs/${id}`, {
+        await fetch(`/api/faqs/${editId}`, {
           method: "PUT",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ question, answer })
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: newText, user_id: user.user_id, role_id: user.role_id })
         });
-        const data = await res.json();
-        alert(data.message || "FAQ updated successfully!");
-        editFaqModal.hide();
-        loadFaqs();
-      } catch (error) {
-        console.error("Error updating FAQ:", error);
-        alert("Failed to update FAQ. Please try again.");
+        editModal.hide();
+        loadMessages();
+      } catch (err) {
+        console.error("Failed to edit message:", err);
       }
     });
 
-    // Delete FAQ
-    async function deleteFaq(id) {
-      try {
-        const res = await fetch(`/api/faqs/${id}`, { method: "DELETE" });
-        const data = await res.json();
-        alert(data.message || "FAQ deleted successfully!");
-        loadFaqs();
-      } catch (error) {
-        console.error("Error deleting FAQ:", error);
-        alert("Failed to delete FAQ. Please try again.");
-      }
+    // 🔍 Live search
+    searchInput.addEventListener("input", () => loadMessages(searchInput.value));
+
+    // 🧹 Escape HTML safely
+    function escapeHtml(unsafe) {
+      return unsafe
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
 
-    // Initial load
-    loadFaqs();
+    // 🔄 Optional auto-refresh (every 5 seconds)
+    setInterval(() => loadMessages(searchInput.value), 5000);
+
+    // 🚀 Initial load
+    loadMessages();
   </script>
 </body>
 </html>
