@@ -8,27 +8,39 @@ const pool = require("../services/db");
     console.log("🔹 Connected to database:", db[0].db);
 
     // ----------------------------
-    // Roles Table
+    // Role Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS Role (
         role_id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(50) NOT NULL,
+        name VARCHAR(50) NOT NULL UNIQUE,
         description TEXT
       );
     `);
     console.log("✅ Table 'Role' created");
 
-    // Departments Table
+    // Insert default roles
+    await pool.query(`
+      INSERT IGNORE INTO Role (role_id, name, description) VALUES
+      (1, 'Admin', 'System administrator with full access'),
+      (2, 'Intern', 'Limited access user role'),
+      (3, 'Part-timer', 'Part-time employee role'),
+      (4, 'Full-timer', 'Full-time employee role');
+    `);
+    console.log("✅ Default roles inserted");
+
+    // ----------------------------
+    // Department Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS Department (
         department_id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
+        name VARCHAR(100) NOT NULL UNIQUE,
         description TEXT
       );
     `);
     console.log("✅ Table 'Department' created");
 
-    // Users Table
+    // ----------------------------
+    // User Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS User (
         user_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -36,7 +48,7 @@ const pool = require("../services/db");
         email VARCHAR(255) NOT NULL UNIQUE,
         full_name VARCHAR(255),
         password VARCHAR(255),
-        role_id INT,
+        role_id INT DEFAULT 1, -- Default to Admin
         department_id INT,
         created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         active BOOLEAN DEFAULT TRUE,
@@ -44,8 +56,9 @@ const pool = require("../services/db");
         FOREIGN KEY (department_id) REFERENCES Department(department_id)
       );
     `);
-    console.log("✅ Table 'User' created");
+    console.log("✅ Table 'User' created with Role & Department relationships");
 
+    // ----------------------------
     // FAQ Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS FAQ (
@@ -62,7 +75,8 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'FAQ' created");
 
-    // SOPCategory Table
+    // ----------------------------
+    // SOP Category Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS SOPCategory (
         category_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -72,6 +86,7 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'SOPCategory' created");
 
+    // ----------------------------
     // SOP Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS SOP (
@@ -89,8 +104,9 @@ const pool = require("../services/db");
         FOREIGN KEY (category_id) REFERENCES SOPCategory(category_id)
       );
     `);
-    console.log("✅ Table 'SOP' created with all foreign keys");
+    console.log("✅ Table 'SOP' created");
 
+    // ----------------------------
     // Procedure Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS Procedure_ (
@@ -107,6 +123,7 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'Procedure_' created");
 
+    // ----------------------------
     // Project Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS Project (
@@ -123,7 +140,8 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'Project' created");
 
-    // ProjectLink Table
+    // ----------------------------
+    // Project Link Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ProjectLink (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -137,6 +155,7 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'ProjectLink' created");
 
+    // ----------------------------
     // SOP Audit Log Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS SOP_Audit_Log (
@@ -151,6 +170,7 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'SOP_Audit_Log' created");
 
+    // ----------------------------
     // Procedure Instance Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS Procedure_Instance (
@@ -169,6 +189,7 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'Procedure_Instance' created");
 
+    // ----------------------------
     // Attachment Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS Attachment (
@@ -184,6 +205,7 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'Attachment' created");
 
+    // ----------------------------
     // Comment Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS Comment (
@@ -198,6 +220,7 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'Comment' created");
 
+    // ----------------------------
     // Access Log Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS Access_Log (
@@ -212,6 +235,25 @@ const pool = require("../services/db");
       );
     `);
     console.log("✅ Table 'Access_Log' created");
+
+    // ----------------------------
+    // Optional View for ease of development
+    await pool.query(`
+      CREATE OR REPLACE VIEW UserWithRole AS
+      SELECT 
+        u.user_id,
+        u.username,
+        u.email,
+        u.full_name,
+        r.name AS role_name,
+        d.name AS department_name,
+        u.created_on,
+        u.active
+      FROM User u
+      LEFT JOIN Role r ON u.role_id = r.role_id
+      LEFT JOIN Department d ON u.department_id = d.department_id;
+    `);
+    console.log("✅ View 'UserWithRole' created for simplified joins");
 
     console.log("🎉 All tables created successfully!");
     process.exit(0);

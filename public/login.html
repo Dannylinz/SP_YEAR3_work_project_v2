@@ -101,10 +101,6 @@
     </form>
 
     <p id="message"></p>
-
-    <div class="register-link">
-      Don't have an account? <a href="register.html">Register here</a>
-    </div>
   </div>
 
   <!-- Bootstrap JS -->
@@ -138,10 +134,19 @@
 
         if (res.ok) {
           message.style.color = "green";
-          message.textContent = result.message + " Redirecting to main page...";
+          message.textContent = result.message + " Redirecting...";
+
+          // Save user info (includes role_id and user_id)
           localStorage.setItem("user", JSON.stringify(result.user));
 
-          setTimeout(() => window.location.href = "index.html", 800);
+          // Role-based redirect
+          setTimeout(() => {
+            if (result.user.role_id === 1) {
+              window.location.href = "register.html"; // Admin page
+            } else {
+              window.location.href = "index.html"; // Normal user page
+            }
+          }, 1000);
         } else {
           message.style.color = "red";
           message.textContent = result.message || "Login failed";

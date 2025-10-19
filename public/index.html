@@ -6,10 +6,7 @@
   <title>Meganet Portal</title>
 
   <!-- Bootstrap CSS -->
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 
   <style>
     body {
@@ -51,7 +48,7 @@
     }
 
     .nav-links {
-      margin-bottom: 30px;
+      margin-bottom: 25px;
     }
 
     .nav-links a {
@@ -71,18 +68,31 @@
       color: #2575fc;
     }
 
-    #logoutBtn {
-      background-color: #ff4757;
+    #logoutBtn, #adminBtn {
       border: none;
       border-radius: 10px;
       padding: 10px 25px;
-      color: #fff;
       font-weight: 600;
       transition: 0.3s;
     }
 
+    #logoutBtn {
+      background-color: #ff4757;
+      color: #fff;
+    }
+
     #logoutBtn:hover {
       background-color: #e84118;
+    }
+
+    #adminBtn {
+      background-color: #28a745;
+      color: #fff;
+      margin-bottom: 15px;
+    }
+
+    #adminBtn:hover {
+      background-color: #218838;
     }
 
     footer {
@@ -97,7 +107,10 @@
     <h1>🌐 Meganet Portal</h1>
     <p id="welcomeText"></p>
 
-    <div class="nav-links">
+    <!-- Admin-only Register Button -->
+    <button id="adminBtn" style="display: none;">Register New User</button>
+
+    <div class="nav-links" id="navLinks">
       <a href="faq.html">FAQ</a>
       <a href="sop.html">SOP</a>
       <a href="projects.html">Projects</a>
@@ -117,15 +130,37 @@
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const user = JSON.parse(localStorage.getItem("user"));
+
       if (!user) {
-        console.warn("No user found, redirecting to login...");
+        console.warn("⚠️ No user found — redirecting to login...");
         window.location.href = "login.html";
         return;
       }
 
-      document.getElementById("welcomeText").textContent = `Welcome back, ${user.username}!`;
-      console.log("✅ User loaded:", user);
+      console.log("✅ Loaded user:", user);
 
+      // Role name mapping
+      const roleMap = {
+        1: "Admin",
+        2: "Intern",
+        3: "Part-timer",
+        4: "Full-timer"
+      };
+
+      const roleName = roleMap[user.role_id] || "User";
+      document.getElementById("welcomeText").textContent =
+        `Welcome back, ${user.username}! You are logged in as a ${roleName}.`;
+
+      // Show Admin-only Register button
+      const adminBtn = document.getElementById("adminBtn");
+      if (user.role_id === 1) {
+        adminBtn.style.display = "inline-block";
+        adminBtn.addEventListener("click", () => {
+          window.location.href = "register.html";
+        });
+      }
+
+      // Logout
       document.getElementById("logoutBtn").addEventListener("click", () => {
         console.log("🚪 Logging out...");
         localStorage.removeItem("user");
