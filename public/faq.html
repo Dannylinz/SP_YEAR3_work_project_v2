@@ -128,7 +128,7 @@
     const editMessageText = document.getElementById("editMessageText");
     let editId = null;
 
-    // 🧭 Load all messages
+    // 🧭 Load all messages (chronological order)
     async function loadMessages(search = "") {
       try {
         const res = await fetch(`/api/faqs?search=${encodeURIComponent(search)}`);
@@ -139,6 +139,9 @@
           chatBox.innerHTML = `<div class="text-center text-muted my-3">No messages yet.</div>`;
           return;
         }
+
+        // Sort by created_at (oldest first)
+        data.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
         data.forEach(msg => {
           const isOwner = msg.created_by_user_id === user.user_id;
@@ -172,10 +175,8 @@
         });
 
         attachEventListeners();
-        const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 50;
-if (isNearBottom) {
-  chatBox.scrollTop = chatBox.scrollHeight;
-} // auto-scroll to bottom
+
+        // ✅ No auto-scroll — allow free user scrolling
       } catch (err) {
         console.error("Error loading messages:", err);
         chatBox.innerHTML = `<div class="alert alert-danger">Failed to load messages.</div>`;
