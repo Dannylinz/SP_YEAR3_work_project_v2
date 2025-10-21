@@ -31,14 +31,13 @@ exports.addFaq = async (req, res) => {
   console.log("🟩 [FAQ] Attempting to add new message:", { question, user_id, username });
 
   if (!question || !user_id || !username) {
-    console.warn("⚠️ [FAQ] Missing fields on insert request");
     return res.status(400).json({ message: "Missing required fields" });
   }
 
   try {
     const sql = `
-      INSERT INTO FAQ (question, created_by_user_id, username)
-      VALUES (?, ?, ?)
+      INSERT INTO FAQ (question, created_by_user_id, username, created_at)
+      VALUES (?, ?, ?, NOW())
     `;
     const [result] = await pool.query(sql, [question, user_id, username]);
 
@@ -49,6 +48,7 @@ exports.addFaq = async (req, res) => {
     res.status(500).json({ message: "Database error", error: err.message });
   }
 };
+
 
 /**
  * 🟨 Edit a message (only by owner or admin)
