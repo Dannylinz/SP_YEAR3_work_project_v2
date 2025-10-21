@@ -23,8 +23,10 @@ if (!fs.existsSync(uploadDir)) {
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public"))); // public folder for HTML
-app.use("/uploads", express.static(uploadDir)); // serve uploaded files
+
+// ✅ Serve static files first
+app.use("/uploads", express.static(uploadDir)); // Serve uploaded files properly
+app.use(express.static(path.join(__dirname, "public"))); // Serve HTML/JS/CSS
 
 // ----------------------------
 // Routes
@@ -34,5 +36,11 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/faqs", faqRoutes);
 
 // ----------------------------
+// Health check
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// ----------------------------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));

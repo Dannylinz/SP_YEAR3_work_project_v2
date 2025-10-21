@@ -64,8 +64,10 @@ const pool = require("../services/db");
       CREATE TABLE IF NOT EXISTS FAQ (
         faq_id INT AUTO_INCREMENT PRIMARY KEY,
         question TEXT,
-        username VARCHAR(100), -- ✅ Added username for chat messages
+        answer TEXT,
+        username VARCHAR(100),
         created_by_user_id INT,
+        file_url VARCHAR(255), -- ✅ supports image/file uploads
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         tags VARCHAR(255),
@@ -73,7 +75,7 @@ const pool = require("../services/db");
         FOREIGN KEY (created_by_user_id) REFERENCES User(user_id)
       );
     `);
-    console.log("✅ Table 'FAQ' created (with username & chat compatibility)");
+    console.log("✅ Table 'FAQ' created (with username & file upload support)");
 
     // ----------------------------
     // SOP Category Table
@@ -255,7 +257,7 @@ const pool = require("../services/db");
     `);
     console.log("✅ View 'UserWithRole' created for simplified joins");
 
-    console.log("🎉 All tables created successfully!");
+    console.log("🎉 All tables created successfully (FAQ file upload ready)!");
     process.exit(0);
 
   } catch (err) {

@@ -46,6 +46,20 @@
       text-align: right;
     }
 
+    .message img {
+      max-width: 200px;
+      border-radius: 10px;
+      margin-top: 5px;
+    }
+
+    .file-link {
+      display: block;
+      color: #0d6efd;
+      text-decoration: underline;
+      margin-top: 5px;
+      word-break: break-all;
+    }
+
     .message-header {
       font-weight: 600;
       font-size: 0.9rem;
@@ -67,9 +81,10 @@
       padding: 2px 6px;
     }
 
-    .text-muted-small {
+    #filePreview {
       font-size: 0.8rem;
-      color: #888;
+      color: #555;
+      margin-top: 4px;
     }
   </style>
 </head>
@@ -87,29 +102,14 @@
     <div id="chatMessages" class="mb-4" style="max-height: 400px; overflow-y: auto;"></div>
 
     <!-- Message Form -->
-    <form id="messageForm" class="d-flex gap-2">
-      <input type="text" id="messageInput" class="form-control" placeholder="Type your message..." required />
-      <button type="submit" class="btn btn-primary">Send</button>
-    </form>
-  </div>
-
-  <!-- Edit Modal -->
-  <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Edit Message</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <textarea id="editMessageText" class="form-control" rows="3"></textarea>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button id="saveEditBtn" class="btn btn-success">Save</button>
-        </div>
+    <form id="messageForm" class="d-flex flex-column gap-2">
+      <div class="d-flex gap-2">
+        <input type="text" id="messageInput" class="form-control" placeholder="Type your message..." />
+        <input type="file" id="fileInput" class="form-control" style="max-width: 200px;" />
+        <button type="submit" class="btn btn-primary">Send</button>
       </div>
-    </div>
+      <div id="filePreview"></div>
+    </form>
   </div>
 
   <!-- Bootstrap JS -->
@@ -117,19 +117,28 @@
 
   <script>
     const user = JSON.parse(localStorage.getItem("user"));
-    if (!user) {
-      window.location.href = "login.html";
-    }
+    if (!user) window.location.href = "login.html";
 
     const chatBox = document.getElementById("chatMessages");
     const messageForm = document.getElementById("messageForm");
     const searchInput = document.getElementById("searchInput");
-    const editModal = new bootstrap.Modal(document.getElementById("editModal"));
-    const editMessageText = document.getElementById("editMessageText");
-    let editId = null;
+    const fileInput = document.getElementById("fileInput");
+    const filePreview = document.getElementById("filePreview");
+
+    // 🖼️ Show filename before upload
+    fileInput.addEventListener("change", () => {
+      filePreview.textContent = fileInput.files.length > 0
+        ? `📎 Selected: ${fileInput.files[0].name}`
+        : "";
+    });
+
+    // 🔽 Auto-scroll to bottom
+    function scrollToBottom() {
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
 
     // 🧭 Load all messages (chronological order)
-    async function loadMessages(search = "") {
+    async function loadMessages(search = "", autoScroll = false) {
       try {
         const res = await fetch(`/api/faqs?search=${encodeURIComponent(search)}`);
         const data = await res.json();
@@ -140,15 +149,20 @@
           return;
         }
 
-        // Sort by created_at (oldest first)
+        // Sort oldest → newest
         data.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
         data.forEach(msg => {
           const isOwner = msg.created_by_user_id === user.user_id;
           const isAdmin = user.role_id === 1;
-          const safeText = escapeHtml(msg.question);
+          const safeText = escapeHtml(msg.question || "");
           const sender = escapeHtml(msg.username || "User");
           const time = msg.created_at ? new Date(msg.created_at).toLocaleString() : "—";
+
+          let fileUrl = msg.file_url || msg.fileUrl || null;
+          if (fileUrl && !fileUrl.startsWith("http")) {
+            fileUrl = `${window.location.origin}${fileUrl.startsWith("/") ? fileUrl : "/" + fileUrl}`;
+          }
 
           const messageWrapper = document.createElement("div");
           messageWrapper.className = "message-wrapper " + (isOwner ? "justify-content-end" : "justify-content-start");
@@ -156,11 +170,22 @@
           const messageDiv = document.createElement("div");
           messageDiv.className = `message ${isOwner ? "message-right" : "message-left"}`;
 
+          let attachmentHTML = "";
+          if (fileUrl) {
+            if (/\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileUrl)) {
+              attachmentHTML = `<img src="${fileUrl}" alt="Image" onerror="this.onerror=null;this.replaceWith(document.createTextNode('📎 [Image not found]'));">`;
+            } else {
+              const filename = fileUrl.split("/").pop();
+              attachmentHTML = `<a href="${fileUrl}" target="_blank" class="file-link">${filename}</a>`;
+            }
+          }
+
           messageDiv.innerHTML = `
             <div class="message-header">
               ${isOwner ? "<span class='text-primary'>You</span>" : sender}
             </div>
             <div>${safeText}</div>
+            ${attachmentHTML}
             <div class="timestamp">${time}</div>
             ${(isOwner || isAdmin)
               ? `<div class="mt-1">
@@ -176,20 +201,20 @@
 
         attachEventListeners();
 
-        // ✅ No auto-scroll — allow free user scrolling
+        // ⬇️ Scroll to bottom after rendering
+        if (autoScroll) scrollToBottom();
       } catch (err) {
         console.error("Error loading messages:", err);
         chatBox.innerHTML = `<div class="alert alert-danger">Failed to load messages.</div>`;
       }
     }
 
-    // ✏️ Attach edit/delete events
+    // ✏️ Edit/Delete buttons
     function attachEventListeners() {
       document.querySelectorAll(".edit-btn").forEach(btn => {
         btn.addEventListener("click", () => {
-          editId = btn.dataset.id;
-          editMessageText.value = btn.dataset.text;
-          editModal.show();
+          const newText = prompt("Edit your message:", btn.dataset.text);
+          if (newText !== null) updateMessage(btn.dataset.id, newText);
         });
       });
 
@@ -201,46 +226,42 @@
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ user_id: user.user_id, role_id: user.role_id })
             });
-            loadMessages();
+            loadMessages(searchInput.value, true);
           }
         });
       });
     }
 
-    // ➕ Add message
+    async function updateMessage(id, newText) {
+      await fetch(`/api/faqs/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: newText, user_id: user.user_id, role_id: user.role_id })
+      });
+      loadMessages(searchInput.value, true);
+    }
+
+    // ➕ Send text or file
     messageForm.addEventListener("submit", async e => {
       e.preventDefault();
       const text = document.getElementById("messageInput").value.trim();
-      if (!text) return;
+      const file = fileInput.files[0];
+      if (!text && !file) return alert("Please enter a message or select a file.");
+
+      const formData = new FormData();
+      formData.append("question", text);
+      formData.append("user_id", user.user_id);
+      formData.append("username", user.username);
+      if (file) formData.append("file", file);
 
       try {
-        await fetch("/api/faqs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: text, user_id: user.user_id, username: user.username })
-        });
+        await fetch("/api/faqs", { method: "POST", body: formData });
         messageForm.reset();
-        loadMessages();
+        filePreview.textContent = "";
+        // 🟦 Reload & scroll to bottom after sending
+        loadMessages(searchInput.value, true);
       } catch (err) {
         console.error("Failed to send message:", err);
-      }
-    });
-
-    // 💾 Save edited message
-    document.getElementById("saveEditBtn").addEventListener("click", async () => {
-      const newText = editMessageText.value.trim();
-      if (!newText) return;
-
-      try {
-        await fetch(`/api/faqs/${editId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: newText, user_id: user.user_id, role_id: user.role_id })
-        });
-        editModal.hide();
-        loadMessages();
-      } catch (err) {
-        console.error("Failed to edit message:", err);
       }
     });
 
@@ -257,11 +278,14 @@
         .replaceAll("'", "&#039;");
     }
 
-    // 🔄 Auto-refresh every 5 seconds
-    setInterval(() => loadMessages(searchInput.value), 5000);
+    // 🔄 Auto-refresh (keep bottom scroll if user is near bottom)
+    setInterval(() => {
+      const nearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
+      loadMessages(searchInput.value, nearBottom);
+    }, 5000);
 
-    // 🚀 Initial load
-    loadMessages();
+    // 🚀 Initial load → scroll to bottom
+    loadMessages("", true);
   </script>
 </body>
 </html>
