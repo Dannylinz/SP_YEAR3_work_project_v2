@@ -1,4 +1,3 @@
-// src/controllers/faqController.js
 const pool = require("../services/db");
 const path = require("path");
 const fs = require("fs");
@@ -56,7 +55,7 @@ exports.addFaq = async (req, res) => {
     res.status(201).json({
       message: "Message added successfully!",
       faq_id: result.insertId,
-      file_url: fileUrl
+      file_url: fileUrl,
     });
   } catch (err) {
     console.error("❌ [FAQ] Database insert error:", err.sqlMessage || err.message);
@@ -65,17 +64,17 @@ exports.addFaq = async (req, res) => {
 };
 
 /**
- * 🟨 Edit a message (only by owner or admin)
+ * 🟨 Edit a message (supports new file)
  */
 exports.updateFaq = async (req, res) => {
   const { id } = req.params;
   const { question, user_id, role_id } = req.body;
+  const newFileUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
-  console.log("🟨 [FAQ] Edit request:", { id, question, user_id, role_id });
+  console.log("🟨 [FAQ] Edit request:", { id, question, user_id, role_id, newFileUrl });
 
-  if (!question || !user_id) {
-    console.warn("⚠️ [FAQ] Missing required fields for update");
-    return res.status(400).json({ message: "Missing required fields" });
+  if (!user_id) {
+    return res.status(400).json({ message: "Missing required user_id" });
   }
 
   try {
@@ -83,11 +82,32 @@ exports.updateFaq = async (req, res) => {
     if (existing.length === 0) return res.status(404).json({ message: "Message not found" });
 
     const message = existing[0];
-    if (message.created_by_user_id !== user_id && role_id !== 1)
-      return res.status(403).json({ message: "Not authorized to edit this message" });
 
-    await pool.query("UPDATE FAQ SET question = ? WHERE faq_id = ?", [question, id]);
+    // 🔐 Authorization check
+    if (message.created_by_user_id !== Number(user_id) && Number(role_id) !== 1) {
+      console.warn("🚫 [FAQ] Unauthorized edit attempt by user:", user_id);
+      return res.status(403).json({ message: "Not authorized to edit this message" });
+    }
+
+    // 🧹 If new file is uploaded, delete the old one
+    if (newFileUrl && message.file_url) {
+      const oldPath = path.join(__dirname, "../../", message.file_url);
+      fs.unlink(oldPath, (err) => {
+        if (err) console.warn("⚠️ [FAQ] Could not delete old file:", err.message);
+        else console.log("🗑️ [FAQ] Old file deleted:", message.file_url);
+      });
+    }
+
+    // 🧩 Prepare update SQL
+    const sql = `
+      UPDATE FAQ 
+      SET question = ?, file_url = COALESCE(?, file_url), updated_on = NOW()
+      WHERE faq_id = ?
+    `;
+
+    await pool.query(sql, [question || message.question, newFileUrl, id]);
     console.log("✅ [FAQ] Message updated successfully, ID:", id);
+
     res.json({ message: "Message updated successfully" });
   } catch (err) {
     console.error("❌ [FAQ] Database update error:", err.sqlMessage || err.message);
@@ -109,13 +129,16 @@ exports.deleteFaq = async (req, res) => {
     if (existing.length === 0) return res.status(404).json({ message: "Message not found" });
 
     const message = existing[0];
-    if (message.created_by_user_id !== user_id && role_id !== 1)
+
+    if (message.created_by_user_id !== Number(user_id) && Number(role_id) !== 1) {
+      console.warn("🚫 [FAQ] Unauthorized delete attempt by user:", user_id);
       return res.status(403).json({ message: "Not authorized to delete this message" });
+    }
 
     // 🧹 Remove file if exists
     if (message.file_url) {
       const filePath = path.join(__dirname, "../../", message.file_url);
-      fs.unlink(filePath, err => {
+      fs.unlink(filePath, (err) => {
         if (err) console.warn("⚠️ [FAQ] Could not delete file:", err.message);
         else console.log("🗑️ [FAQ] File deleted:", message.file_url);
       });

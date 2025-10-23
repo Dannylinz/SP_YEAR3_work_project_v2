@@ -1,4 +1,3 @@
-// src/routes/faqRoutes.js
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
@@ -11,10 +10,10 @@ const {
 
 const router = express.Router();
 
-// 🧩 Setup file upload using Multer
+// 🧩 File upload config
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/"); // folder where files will be saved
+    cb(null, "uploads/");
   },
   filename: (req, file, cb) => {
     const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -24,16 +23,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// ✅ Get all FAQs (with optional ?search= query)
+// ✅ Routes
 router.get("/", getAllFaqs);
-
-// ✅ Add a new FAQ (chat message + optional file)
 router.post("/", upload.single("file"), addFaq);
 
-// ✅ Edit an FAQ (only admin or message owner)
-router.put("/:id", updateFaq);
+// 🟨 Important: use multer for PUT too, since file can be replaced
+router.put("/:id", upload.single("file"), updateFaq);
 
-// ✅ Delete an FAQ (only admin or message owner)
 router.delete("/:id", deleteFaq);
 
 module.exports = router;

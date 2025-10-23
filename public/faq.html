@@ -50,6 +50,12 @@
       max-width: 200px;
       border-radius: 10px;
       margin-top: 5px;
+      cursor: pointer;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .message img:hover {
+      transform: scale(1.05);
     }
 
     .file-link {
@@ -86,6 +92,28 @@
       color: #555;
       margin-top: 4px;
     }
+
+    /* 🔍 Zoom modal */
+    #imgModal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      justify-content: center;
+      align-items: center;
+      cursor: zoom-out;
+    }
+
+    #imgModal img {
+      max-width: 90%;
+      max-height: 90%;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+    }
   </style>
 </head>
 <body>
@@ -112,7 +140,11 @@
     </form>
   </div>
 
-  <!-- Bootstrap JS -->
+  <!-- 🖼️ Image Zoom Modal -->
+  <div id="imgModal">
+    <img id="modalImg" src="" alt="Zoomed image" />
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
@@ -124,6 +156,8 @@
     const searchInput = document.getElementById("searchInput");
     const fileInput = document.getElementById("fileInput");
     const filePreview = document.getElementById("filePreview");
+    const imgModal = document.getElementById("imgModal");
+    const modalImg = document.getElementById("modalImg");
 
     // 🖼️ Show filename before upload
     fileInput.addEventListener("change", () => {
@@ -137,19 +171,18 @@
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // 🧭 Load all messages (chronological order)
+    // 🧭 Load messages
     async function loadMessages(search = "", autoScroll = false) {
       try {
         const res = await fetch(`/api/faqs?search=${encodeURIComponent(search)}`);
         const data = await res.json();
-
         chatBox.innerHTML = "";
+
         if (!Array.isArray(data) || data.length === 0) {
           chatBox.innerHTML = `<div class="text-center text-muted my-3">No messages yet.</div>`;
           return;
         }
 
-        // Sort oldest → newest
         data.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
         data.forEach(msg => {
@@ -173,7 +206,7 @@
           let attachmentHTML = "";
           if (fileUrl) {
             if (/\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileUrl)) {
-              attachmentHTML = `<img src="${fileUrl}" alt="Image" onerror="this.onerror=null;this.replaceWith(document.createTextNode('📎 [Image not found]'));">`;
+              attachmentHTML = `<img src="${fileUrl}" alt="Image" class="zoomable-img" onerror="this.onerror=null;this.replaceWith(document.createTextNode('📎 [Image not found]'));">`;
             } else {
               const filename = fileUrl.split("/").pop();
               attachmentHTML = `<a href="${fileUrl}" target="_blank" class="file-link">${filename}</a>`;
@@ -189,10 +222,12 @@
             <div class="timestamp">${time}</div>
             ${(isOwner || isAdmin)
               ? `<div class="mt-1">
-                  <button class="btn btn-sm btn-warning edit-btn" data-id="${msg.faq_id}" data-text="${safeText}">✏️</button>
+                  <button class="btn btn-sm btn-warning edit-btn" 
+                    data-id="${msg.faq_id}" 
+                    data-text="${safeText}"
+                    data-file="${fileUrl || ''}">✏️</button>
                   <button class="btn btn-sm btn-danger delete-btn" data-id="${msg.faq_id}">🗑️</button>
-                </div>`
-              : ""}
+                </div>` : ""}
           `;
 
           messageWrapper.appendChild(messageDiv);
@@ -200,8 +235,7 @@
         });
 
         attachEventListeners();
-
-        // ⬇️ Scroll to bottom after rendering
+        enableImageZoom();
         if (autoScroll) scrollToBottom();
       } catch (err) {
         console.error("Error loading messages:", err);
@@ -209,15 +243,81 @@
       }
     }
 
+    // 🖼️ Image Zoom Handler
+    function enableImageZoom() {
+      document.querySelectorAll(".zoomable-img").forEach(img => {
+        img.addEventListener("click", () => {
+          modalImg.src = img.src;
+          imgModal.style.display = "flex";
+        });
+      });
+    }
+
+    imgModal.addEventListener("click", () => {
+      imgModal.style.display = "none";
+      modalImg.src = "";
+    });
+
     // ✏️ Edit/Delete buttons
     function attachEventListeners() {
+      // 🟡 EDIT WITH FILE SUPPORT
       document.querySelectorAll(".edit-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const newText = prompt("Edit your message:", btn.dataset.text);
-          if (newText !== null) updateMessage(btn.dataset.id, newText);
+        btn.addEventListener("click", async () => {
+          const oldText = btn.dataset.text || "";
+          const oldFile = btn.dataset.file || "";
+          
+          const newText = prompt("Edit your message text:", oldText);
+          if (newText === null) return;
+
+          // Create a hidden file input for optional file change
+          const newFileInput = document.createElement("input");
+          newFileInput.type = "file";
+          newFileInput.style.display = "none";
+          document.body.appendChild(newFileInput);
+
+          if (confirm("Do you want to update or replace the attached file/image?")) {
+            newFileInput.click();
+          }
+
+          newFileInput.addEventListener("change", async () => {
+            const formData = new FormData();
+            formData.append("question", newText);
+            formData.append("user_id", user.user_id);
+            formData.append("role_id", user.role_id);
+
+            if (newFileInput.files.length > 0) {
+              formData.append("file", newFileInput.files[0]);
+            }
+
+            try {
+              await fetch(`/api/faqs/${btn.dataset.id}`, {
+                method: "PUT",
+                body: formData,
+              });
+              loadMessages(searchInput.value, true);
+            } catch (err) {
+              console.error("Failed to update message:", err);
+            } finally {
+              document.body.removeChild(newFileInput);
+            }
+          });
+
+          // If user chooses not to update file
+          setTimeout(async () => {
+            if (!newFileInput.files.length) {
+              const res = await fetch(`/api/faqs/${btn.dataset.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ question: newText, user_id: user.user_id, role_id: user.role_id })
+              });
+              if (res.ok) loadMessages(searchInput.value, true);
+              document.body.removeChild(newFileInput);
+            }
+          }, 1500);
         });
       });
 
+      // 🔴 DELETE
       document.querySelectorAll(".delete-btn").forEach(btn => {
         btn.addEventListener("click", async () => {
           if (confirm("Delete this message?")) {
@@ -232,16 +332,7 @@
       });
     }
 
-    async function updateMessage(id, newText) {
-      await fetch(`/api/faqs/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: newText, user_id: user.user_id, role_id: user.role_id })
-      });
-      loadMessages(searchInput.value, true);
-    }
-
-    // ➕ Send text or file
+    // ➕ Send new message
     messageForm.addEventListener("submit", async e => {
       e.preventDefault();
       const text = document.getElementById("messageInput").value.trim();
@@ -258,7 +349,6 @@
         await fetch("/api/faqs", { method: "POST", body: formData });
         messageForm.reset();
         filePreview.textContent = "";
-        // 🟦 Reload & scroll to bottom after sending
         loadMessages(searchInput.value, true);
       } catch (err) {
         console.error("Failed to send message:", err);
@@ -278,13 +368,13 @@
         .replaceAll("'", "&#039;");
     }
 
-    // 🔄 Auto-refresh (keep bottom scroll if user is near bottom)
+    // 🔄 Auto-refresh
     setInterval(() => {
       const nearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
       loadMessages(searchInput.value, nearBottom);
     }, 5000);
 
-    // 🚀 Initial load → scroll to bottom
+    // 🚀 Initial load
     loadMessages("", true);
   </script>
 </body>
