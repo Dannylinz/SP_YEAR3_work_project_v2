@@ -6,12 +6,12 @@
   <title>SOP Management</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <style>
-    /* 🔹 Make SOP description box resizable */
+    /* ✅ Make SOP description resizable but still read-only */
     .sop-description {
       width: 100%;
       min-height: 100px;
       overflow-y: auto;
-      resize: vertical; /* Allows user to resize vertically */
+      resize: vertical; /* allow manual vertical resizing */
       padding: 8px;
       border: 1px solid #dee2e6;
       border-radius: 5px;
@@ -35,6 +35,7 @@
           <li class="nav-item"><a class="nav-link active" href="sop.html">SOP Management</a></li>
           <li class="nav-item"><a class="nav-link" href="index.html">Dashboard</a></li>
           <li class="nav-item"><a class="nav-link" href="faq.html">Chat Board</a></li>
+          <li class="nav-item"><a class="nav-link" href="chatbox.html">FAQ</a></li>
           <li class="nav-item"><a class="nav-link" href="projects.html">Projects</a></li>
           <li class="nav-item"><a class="nav-link" href="profile.html">Profile</a></li>
           <li class="nav-item"><a class="nav-link" href="login.html">Logout</a></li>
@@ -298,6 +299,37 @@
           }
         };
       }
+
+      // ---------------- Add Category ----------------
+      categoryForm.addEventListener("submit", async e => {
+        e.preventDefault();
+        const name = document.getElementById("category_name").value.trim();
+        if (!name) return alert("Please enter a category name.");
+        await fetch(`${API_BASE}/category`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ category_name: name })
+        });
+        categoryForm.reset();
+        loadCategories();
+      });
+
+      // ---------------- Add SOP ----------------
+      sopForm.addEventListener("submit", async e => {
+        e.preventDefault();
+        const title = sop_title.value.trim(), desc = sop_description.value.trim(), catId = sop_category.value;
+        const file = sop_file.files[0];
+        if (!title || !desc || !catId) return alert("Fill all fields!");
+        const formData = new FormData();
+        formData.append("title", title);
+        formData.append("content", desc);
+        formData.append("category_id", catId);
+        formData.append("created_by_user_id", user.user_id);
+        if (file) formData.append("file", file);
+        await fetch(API_BASE, { method: "POST", body: formData });
+        sopForm.reset();
+        loadSOPs();
+      });
 
       // ---------------- Initial Load ----------------
       loadCategories();
