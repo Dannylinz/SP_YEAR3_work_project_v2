@@ -59,7 +59,7 @@ const pool = require("../services/db");
     console.log("✅ Table 'User' created with Role & Department relationships");
 
     // ----------------------------
-    // FAQ Table (Chat Board + FAQ hybrid)
+    // FAQ Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS FAQ (
         faq_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -67,7 +67,7 @@ const pool = require("../services/db");
         answer TEXT,
         username VARCHAR(100),
         created_by_user_id INT,
-        file_url VARCHAR(255), -- ✅ supports image/file uploads
+        file_url VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         tags VARCHAR(255),
@@ -239,6 +239,36 @@ const pool = require("../services/db");
     console.log("✅ Table 'Access_Log' created");
 
     // ----------------------------
+    // ChatboxTopic Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ChatboxTopic (
+        topic_id INT AUTO_INCREMENT PRIMARY KEY,
+        topic_name VARCHAR(255) NOT NULL UNIQUE,
+        created_by_user_id INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by_user_id) REFERENCES User(user_id)
+      );
+    `);
+    console.log("✅ Table 'ChatboxTopic' created");
+
+    // ----------------------------
+    // ChatboxQuestion Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ChatboxQuestion (
+        question_id INT AUTO_INCREMENT PRIMARY KEY,
+        topic_id INT NOT NULL,
+        question_text TEXT NOT NULL,
+        answer_text LONGTEXT,
+        created_by_user_id INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (topic_id) REFERENCES ChatboxTopic(topic_id),
+        FOREIGN KEY (created_by_user_id) REFERENCES User(user_id)
+      );
+    `);
+    console.log("✅ Table 'ChatboxQuestion' created");
+
+    // ----------------------------
     // Optional View for ease of development
     await pool.query(`
       CREATE OR REPLACE VIEW UserWithRole AS
@@ -257,7 +287,7 @@ const pool = require("../services/db");
     `);
     console.log("✅ View 'UserWithRole' created for simplified joins");
 
-    console.log("🎉 All tables created successfully (FAQ file upload ready)!");
+    console.log("🎉 All tables created successfully (Chatbox integration added)!");
     process.exit(0);
 
   } catch (err) {

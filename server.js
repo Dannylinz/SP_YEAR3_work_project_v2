@@ -8,6 +8,7 @@ const userRoutes = require("./src/routes/userRoutes");
 const sopRoutes = require("./src/routes/sopRoutes");
 const projectRoutes = require("./src/routes/projectRoutes");
 const faqRoutes = require("./src/routes/faqRoutes");
+const chatboxRoutes = require("./src/routes/chatboxRoutes");
 
 const app = express();
 
@@ -34,7 +35,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/sops", sopRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/faqs", faqRoutes);
-
+app.use("/api/chatbox", chatboxRoutes);
 // ----------------------------
 // Health check
 app.get("/", (req, res) => {
