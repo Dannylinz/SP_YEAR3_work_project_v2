@@ -2,31 +2,10 @@ const pool = require("../services/db");
 
 (async () => {
   try {
-    console.log("🔧 Starting database setup...");
+    console.log("🔧 Starting MAIN database setup (meganet)...");
 
     const [db] = await pool.query("SELECT DATABASE() AS db");
     console.log("🔹 Connected to database:", db[0].db);
-
-    // ----------------------------
-    // Role Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS Role (
-        role_id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(50) NOT NULL UNIQUE,
-        description TEXT
-      );
-    `);
-    console.log("✅ Table 'Role' created");
-
-    // Insert default roles
-    await pool.query(`
-      INSERT IGNORE INTO Role (role_id, name, description) VALUES
-      (1, 'Admin', 'System administrator with full access'),
-      (2, 'Intern', 'Limited access user role'),
-      (3, 'Part-timer', 'Part-time employee role'),
-      (4, 'Full-timer', 'Full-time employee role');
-    `);
-    console.log("✅ Default roles inserted");
 
     // ----------------------------
     // Department Table
@@ -38,25 +17,6 @@ const pool = require("../services/db");
       );
     `);
     console.log("✅ Table 'Department' created");
-
-    // ----------------------------
-    // User Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS User (
-        user_id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(255) NOT NULL UNIQUE,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        full_name VARCHAR(255),
-        password VARCHAR(255),
-        role_id INT DEFAULT 1,
-        department_id INT,
-        created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        active BOOLEAN DEFAULT TRUE,
-        FOREIGN KEY (role_id) REFERENCES Role(role_id),
-        FOREIGN KEY (department_id) REFERENCES Department(department_id)
-      );
-    `);
-    console.log("✅ Table 'User' created with Role & Department relationships");
 
     // ----------------------------
     // FAQ Table
@@ -71,11 +31,10 @@ const pool = require("../services/db");
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         tags VARCHAR(255),
-        is_published BOOLEAN DEFAULT FALSE,
-        FOREIGN KEY (created_by_user_id) REFERENCES User(user_id)
+        is_published BOOLEAN DEFAULT FALSE
       );
     `);
-    console.log("✅ Table 'FAQ' created (with username & file upload support)");
+    console.log("✅ Table 'FAQ' created");
 
     // ----------------------------
     // SOP Category Table
@@ -100,10 +59,7 @@ const pool = require("../services/db");
         created_by_user_id INT,
         status ENUM('draft','published','archived') DEFAULT 'draft',
         department_id INT,
-        category_id INT,
-        FOREIGN KEY (created_by_user_id) REFERENCES User(user_id),
-        FOREIGN KEY (department_id) REFERENCES Department(department_id),
-        FOREIGN KEY (category_id) REFERENCES SOPCategory(category_id)
+        category_id INT
       );
     `);
     console.log("✅ Table 'SOP' created");
@@ -119,8 +75,7 @@ const pool = require("../services/db");
         created_by_user_id INT,
         version VARCHAR(20),
         status ENUM('draft','published','archived') DEFAULT 'draft',
-        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (created_by_user_id) REFERENCES User(user_id)
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       );
     `);
     console.log("✅ Table 'Procedure_' created");
@@ -136,8 +91,7 @@ const pool = require("../services/db");
         docs_link VARCHAR(255),
         owner_user_id INT,
         status ENUM('active','archived','planning') DEFAULT 'active',
-        tags VARCHAR(255),
-        FOREIGN KEY (owner_user_id) REFERENCES User(user_id)
+        tags VARCHAR(255)
       );
     `);
     console.log("✅ Table 'Project' created");
@@ -151,8 +105,7 @@ const pool = require("../services/db");
         display_name VARCHAR(255),
         location_type ENUM('repo','drive','wiki','url'),
         url VARCHAR(255),
-        notes TEXT,
-        FOREIGN KEY (project_id) REFERENCES Project(project_id)
+        notes TEXT
       );
     `);
     console.log("✅ Table 'ProjectLink' created");
@@ -165,9 +118,7 @@ const pool = require("../services/db");
         sop_id INT,
         changed_by_user_id INT,
         change_summary TEXT,
-        changed_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (sop_id) REFERENCES SOP(sop_id),
-        FOREIGN KEY (changed_by_user_id) REFERENCES User(user_id)
+        changed_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log("✅ Table 'SOP_Audit_Log' created");
@@ -183,10 +134,7 @@ const pool = require("../services/db");
         started_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         completed_on TIMESTAMP NULL,
         status ENUM('in_progress','completed','cancelled') DEFAULT 'in_progress',
-        step_status_json JSON,
-        FOREIGN KEY (procedure_id) REFERENCES Procedure_(procedure_id),
-        FOREIGN KEY (subject_user_id) REFERENCES User(user_id),
-        FOREIGN KEY (started_by_user_id) REFERENCES User(user_id)
+        step_status_json JSON
       );
     `);
     console.log("✅ Table 'Procedure_Instance' created");
@@ -201,8 +149,7 @@ const pool = require("../services/db");
         filename VARCHAR(255),
         storage_path VARCHAR(255),
         uploaded_by_user_id INT,
-        uploaded_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (uploaded_by_user_id) REFERENCES User(user_id)
+        uploaded_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log("✅ Table 'Attachment' created");
@@ -216,8 +163,7 @@ const pool = require("../services/db");
         parent_id INT,
         user_id INT,
         content TEXT,
-        created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES User(user_id)
+        created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log("✅ Table 'Comment' created");
@@ -232,8 +178,7 @@ const pool = require("../services/db");
         resource_type VARCHAR(50),
         resource_id INT,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        ip_address VARCHAR(50),
-        FOREIGN KEY (user_id) REFERENCES User(user_id)
+        ip_address VARCHAR(50)
       );
     `);
     console.log("✅ Table 'Access_Log' created");
@@ -245,8 +190,7 @@ const pool = require("../services/db");
         topic_id INT AUTO_INCREMENT PRIMARY KEY,
         topic_name VARCHAR(255) NOT NULL UNIQUE,
         created_by_user_id INT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (created_by_user_id) REFERENCES User(user_id)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log("✅ Table 'ChatboxTopic' created");
@@ -261,37 +205,16 @@ const pool = require("../services/db");
         answer_text LONGTEXT,
         created_by_user_id INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (topic_id) REFERENCES ChatboxTopic(topic_id),
-        FOREIGN KEY (created_by_user_id) REFERENCES User(user_id)
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       );
     `);
     console.log("✅ Table 'ChatboxQuestion' created");
 
-    // ----------------------------
-    // Optional View for ease of development
-    await pool.query(`
-      CREATE OR REPLACE VIEW UserWithRole AS
-      SELECT 
-        u.user_id,
-        u.username,
-        u.email,
-        u.full_name,
-        r.name AS role_name,
-        d.name AS department_name,
-        u.created_on,
-        u.active
-      FROM User u
-      LEFT JOIN Role r ON u.role_id = r.role_id
-      LEFT JOIN Department d ON u.department_id = d.department_id;
-    `);
-    console.log("✅ View 'UserWithRole' created for simplified joins");
-
-    console.log("🎉 All tables created successfully (Chatbox integration added)!");
+    console.log("🎉 All MAIN tables created successfully (User/Role handled by meganet_auth DB)!");
     process.exit(0);
 
   } catch (err) {
-    console.error("❌ Error creating tables:", err);
+    console.error("❌ Error creating MAIN tables:", err);
     process.exit(1);
   }
 })();

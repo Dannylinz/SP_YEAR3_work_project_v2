@@ -1,8 +1,12 @@
 // controllers/chatboxController.js
-const pool = require("../services/db");
+const pool = require("../services/db");           // For main database (meganet)
+const authPool = require("../services/authDb");   // For auth database (meganet_auth)
 
-// ---------------------------
-// Simple admin gate
+const authDbName = process.env.AUTH_DB_NAME || "meganet_auth";
+
+/* =========================================================
+   SIMPLE ADMIN GATE
+   ========================================================= */
 function isAdmin(role_id) {
   return String(role_id) === "1";
 }
@@ -13,16 +17,28 @@ function isAdmin(role_id) {
 exports.getTopics = async (req, res) => {
   console.log("🔹 [getTopics] Request received");
   try {
-    const [rows] = await pool.query(`
-      SELECT t.topic_id, t.topic_name, t.created_by_user_id, t.created_at,
-             u.username
+    // ✅ Fetch topics from main DB
+    const [topics] = await pool.query(`
+      SELECT 
+        t.topic_id,
+        t.topic_name,
+        t.created_by_user_id,
+        t.created_at
       FROM ChatboxTopic t
-      LEFT JOIN User u ON t.created_by_user_id = u.user_id
       ORDER BY t.created_at DESC
     `);
 
-    console.log(`✅ [getTopics] Retrieved ${rows.length} topics`);
-    res.status(200).json(rows);
+    // ✅ Fetch usernames from auth DB
+    for (let topic of topics) {
+      const [userRows] = await authPool.query(
+        `SELECT username FROM User WHERE user_id = ?`,
+        [topic.created_by_user_id]
+      );
+      topic.username = userRows.length ? userRows[0].username : "Unknown";
+    }
+
+    console.log(`✅ [getTopics] Retrieved ${topics.length} topics`);
+    res.status(200).json(topics);
   } catch (err) {
     console.error("❌ [getTopics] Database error:", err);
     res.status(500).json({ message: "Database error", error: err });
@@ -44,11 +60,11 @@ exports.createTopic = async (req, res) => {
       return res.status(400).json({ message: "Missing fields" });
     }
 
-    console.log("🟢 [createTopic] Inserting topic:", topic_name);
-
     const [result] = await pool.query(
-      `INSERT INTO ChatboxTopic (topic_name, created_by_user_id, created_at)
-       VALUES (?, ?, NOW())`,
+      `
+      INSERT INTO ChatboxTopic (topic_name, created_by_user_id, created_at)
+      VALUES (?, ?, NOW())
+      `,
       [topic_name.trim(), user_id]
     );
 
@@ -84,8 +100,6 @@ exports.deleteTopic = async (req, res) => {
       return res.status(400).json({ message: "Missing topic id" });
     }
 
-    console.log("🟢 [deleteTopic] Deleting topic:", id);
-
     const [r] = await pool.query(
       `DELETE FROM ChatboxTopic WHERE topic_id = ?`,
       [id]
@@ -116,22 +130,34 @@ exports.getQuestionsByTopic = async (req, res) => {
       return res.status(400).json({ message: "Missing topic_id" });
     }
 
-    const [rows] = await pool.query(
+    // ✅ Get questions from main DB
+    const [questions] = await pool.query(
       `
-      SELECT q.question_id, q.topic_id, 
-             q.question_text AS question, 
-             q.answer_text AS answer,
-             q.created_by_user_id, u.username, q.created_at
+      SELECT 
+        q.question_id,
+        q.topic_id,
+        q.question_text AS question,
+        q.answer_text AS answer,
+        q.created_by_user_id,
+        q.created_at
       FROM ChatboxQuestion q
-      LEFT JOIN User u ON q.created_by_user_id = u.user_id
       WHERE q.topic_id = ?
       ORDER BY q.created_at DESC
-    `,
+      `,
       [topic_id]
     );
 
-    console.log(`✅ [getQuestionsByTopic] Found ${rows.length} questions`);
-    res.status(200).json(rows);
+    // ✅ Attach username from auth DB
+    for (let q of questions) {
+      const [userRows] = await authPool.query(
+        `SELECT username FROM User WHERE user_id = ?`,
+        [q.created_by_user_id]
+      );
+      q.username = userRows.length ? userRows[0].username : "Unknown";
+    }
+
+    console.log(`✅ [getQuestionsByTopic] Found ${questions.length} questions`);
+    res.status(200).json(questions);
   } catch (err) {
     console.error("❌ [getQuestionsByTopic] DB error:", err);
     res.status(500).json({
@@ -161,11 +187,12 @@ exports.createQuestion = async (req, res) => {
       return res.status(400).json({ message: "Missing fields" });
     }
 
-    console.log("🟢 [createQuestion] Inserting question for topic:", topic_id);
-
     const [result] = await pool.query(
-      `INSERT INTO ChatboxQuestion (topic_id, question_text, answer_text, created_by_user_id, created_at)
-       VALUES (?, ?, ?, ?, NOW())`,
+      `
+      INSERT INTO ChatboxQuestion 
+        (topic_id, question_text, answer_text, created_by_user_id, created_at)
+      VALUES (?, ?, ?, ?, NOW())
+      `,
       [topic_id, question, answer, user_id]
     );
 
@@ -192,20 +219,16 @@ exports.updateQuestion = async (req, res) => {
     }
 
     if (!id || !question || !answer) {
-      console.warn("⚠️ [updateQuestion] Missing fields:", {
-        id,
-        question,
-        answer,
-      });
+      console.warn("⚠️ [updateQuestion] Missing fields:", { id, question, answer });
       return res.status(400).json({ message: "Missing fields" });
     }
 
-    console.log("🟢 [updateQuestion] Updating question:", id);
-
     const [r] = await pool.query(
-      `UPDATE ChatboxQuestion 
-       SET question_text = ?, answer_text = ?, updated_at = NOW()
-       WHERE question_id = ?`,
+      `
+      UPDATE ChatboxQuestion 
+      SET question_text = ?, answer_text = ?, updated_at = NOW()
+      WHERE question_id = ?
+      `,
       [question, answer, id]
     );
 
@@ -238,12 +261,7 @@ exports.deleteQuestion = async (req, res) => {
       return res.status(400).json({ message: "Missing question id" });
     }
 
-    console.log("🟢 [deleteQuestion] Deleting question:", id);
-
-    const [r] = await pool.query(
-      `DELETE FROM ChatboxQuestion WHERE question_id = ?`,
-      [id]
-    );
+    const [r] = await pool.query(`DELETE FROM ChatboxQuestion WHERE question_id = ?`, [id]);
 
     if (r.affectedRows === 0) {
       console.warn("⚠️ [deleteQuestion] Question not found:", id);

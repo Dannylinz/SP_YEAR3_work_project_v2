@@ -9,6 +9,7 @@ const sopRoutes = require("./src/routes/sopRoutes");
 const projectRoutes = require("./src/routes/projectRoutes");
 const faqRoutes = require("./src/routes/faqRoutes");
 const chatboxRoutes = require("./src/routes/chatboxRoutes");
+const authRoutes = require("./src/routes/authRoutes");
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use("/api/sops", sopRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/faqs", faqRoutes);
 app.use("/api/chatbox", chatboxRoutes);
+app.use("/api/auth", authRoutes);
 // ----------------------------
 // Health check
 app.get("/", (req, res) => {

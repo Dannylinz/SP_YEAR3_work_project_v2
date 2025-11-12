@@ -25,7 +25,7 @@
       padding: 40px 50px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
       text-align: center;
-      max-width: 600px;
+      max-width: 650px;
       width: 90%;
       backdrop-filter: blur(10px);
       animation: fadeIn 0.6s ease-in-out;
@@ -38,7 +38,7 @@
 
     h1 {
       font-weight: 700;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
     }
 
     #welcomeText {
@@ -95,6 +95,27 @@
       background-color: #218838;
     }
 
+    .external-links {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .external-links h5 {
+      color: #f5f5f5;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+
+    .external-links a {
+      display: block;
+      color: #fff;
+      text-decoration: underline;
+      margin: 3px 0;
+      font-size: 0.95rem;
+    }
+
     footer {
       margin-top: 25px;
       font-size: 0.9rem;
@@ -105,7 +126,7 @@
 <body>
   <div class="container">
     <h1>🌐 Meganet Portal</h1>
-    <p id="welcomeText"></p>
+    <p id="welcomeText">Loading user...</p>
 
     <!-- Admin-only Register Button -->
     <button id="adminBtn" style="display: none;">Register New User</button>
@@ -118,6 +139,13 @@
       <a href="inventory.html">Inventory</a>
     </div>
 
+    <div class="external-links">
+      <h5>Other Intern Projects (Shared Auth)</h5>
+      <a href="#" target="_blank">Noise Monitoring Dashboard</a>
+      <a href="#" target="_blank">Try-On Fashion MVP</a>
+      <a href="#" target="_blank">IoT Alert Visualization</a>
+    </div>
+
     <button id="logoutBtn">Logout</button>
 
     <footer>
@@ -125,7 +153,6 @@
     </footer>
   </div>
 
-  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
@@ -140,7 +167,6 @@
 
       console.log("✅ Loaded user:", user);
 
-      // Role name mapping
       const roleMap = {
         1: "Admin",
         2: "Intern",
@@ -161,7 +187,7 @@
         });
       }
 
-      // Logout
+      // Logout handler
       document.getElementById("logoutBtn").addEventListener("click", () => {
         console.log("🚪 Logging out...");
         localStorage.removeItem("user");

@@ -101,7 +101,6 @@
         <input type="password" id="password" class="form-control" placeholder="Password" required />
       </div>
 
-      <!-- Role Dropdown -->
       <div class="mb-3">
         <select id="role_id" class="form-control" required>
           <option value="" disabled selected>Select Role</option>
@@ -121,7 +120,6 @@
     </div>
   </div>
 
-  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
@@ -129,11 +127,15 @@
       const form = document.getElementById("registerForm");
       const message = document.getElementById("message");
 
-      // Retrieve current logged-in user
+      // Check if current user is logged in and admin
       const currentUser = JSON.parse(localStorage.getItem("user"));
+      if (!currentUser) {
+        alert("Please log in first!");
+        window.location.href = "login.html";
+        return;
+      }
 
-      // ✅ Restrict access to admins only
-      if (!currentUser || currentUser.role_id !== 1) {
+      if (currentUser.role_id !== 1) {
         alert("Only Admins can access this page!");
         window.location.href = "index.html";
         return;
@@ -142,7 +144,7 @@
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        const data = {
+        const payload = {
           username: document.getElementById("username").value.trim(),
           full_name: document.getElementById("full_name").value.trim(),
           email: document.getElementById("email").value.trim(),
@@ -155,17 +157,17 @@
         message.style.color = "black";
 
         try {
-          const res = await fetch("http://localhost:3000/api/users/register", {
+          const res = await fetch("/api/users/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data)
+            body: JSON.stringify(payload)
           });
 
           const result = await res.json();
 
           if (res.ok) {
             message.style.color = "green";
-            message.textContent = "✅ " + result.message;
+            message.textContent = "✅ " + (result.message || "User registered successfully.");
             form.reset();
           } else {
             message.style.color = "red";
