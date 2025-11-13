@@ -1,46 +1,246 @@
 <!DOCTYPE html>
-<html>
-<head><title>Projects</title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Profile | Meganet Portal</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      font-family: "Poppins", sans-serif;
+      min-height: 100vh;
+      color: #333;
+    }
+    .profile-card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      padding: 30px;
+      margin-top: 40px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .profile-header {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 15px;
+    }
+    .avatar {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: #2575fc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      font-weight: 600;
+      color: white;
+    }
+    .section {
+      margin-top: 25px;
+    }
+    .section h4 {
+      border-left: 5px solid #2575fc;
+      padding-left: 10px;
+      color: #2575fc;
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+    .logout-btn {
+      background-color: #ff5252;
+      border: none;
+      color: white;
+      font-weight: 600;
+      border-radius: 8px;
+      padding: 10px 20px;
+      float: right;
+      transition: 0.3s;
+    }
+    .logout-btn:hover {
+      background-color: #d43b3b;
+    }
+  </style>
+</head>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand d-flex align-items-center" href="#">
+  <img src="pictures/logo.png" alt="MegaNet Logo"
+       style="height: 40px; width: auto; margin-right: 8px;">
+</a>
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link active" href="profile.html">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" href="index.html">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="sop.html">SOP Management</a></li>
+          <li class="nav-item"><a class="nav-link" href="chatbox.html">FAQ</a></li>
+          <li class="nav-item"><a class="nav-link" href="faq.html">Chat Board</a></li>
+          <li class="nav-item"><a class="nav-link" href="login.html">Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
 <body>
-<h2>Projects</h2>
-<a href="index.html">Dashboard</a>
+  <div class="container">
+    <div class="profile-card">
+      <button id="logoutBtn" class="logout-btn">Logout</button>
 
-<ul id="projectList"></ul>
+      <div class="profile-header">
+        <div class="avatar" id="avatar">U</div>
+        <div>
+          <h3 id="fullName">User Name</h3>
+          <p class="text-muted mb-1" id="username">@username</p>
+          <p class="text-muted" id="email">user@example.com</p>
+          <span class="badge bg-primary" id="role">Role</span>
+        </div>
+      </div>
 
-<form id="addProjectForm">
-  <input type="text" id="name" placeholder="Project Name" required>
-  <input type="text" id="description" placeholder="Description" required>
-  <button type="submit">Add Project</button>
-</form>
+      <div class="section">
+        <h4>Your SOPs</h4>
+        <ul id="sopList" class="list-group"></ul>
+      </div>
 
-<script>
-async function loadProjects() {
-  const res = await fetch("/api/projects");
-  const data = await res.json();
-  const list = document.getElementById("projectList");
-  list.innerHTML = "";
-  data.forEach(p => {
-    const li = document.createElement("li");
-    li.textContent = p.name + " - " + p.description;
-    list.appendChild(li);
-  });
-}
-document.getElementById("addProjectForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  const name = document.getElementById("name").value;
-  const description = document.getElementById("description").value;
-  const res = await fetch("/api/projects", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({name, description})
-  });
-  const data = await res.json();
-  alert(data.message);
-  loadProjects();
-});
-loadProjects();
-</script>
+      <div class="section">
+        <h4>Your MESSAGES</h4>
+        <ul id="chatList" class="list-group"></ul>
+      </div>
+
+      <div class="section">
+        <h4>Your FAQs</h4>
+        <ul id="faqList" class="list-group"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      const user = JSON.parse(storedUser);
+      const userId = user.user_id;
+
+      // Load profile details from backend
+      const profileRes = await fetch(`/api/profile/${userId}`);
+      const profile = await profileRes.json();
+
+      // Fill profile info
+      const avatarLetter = (profile.full_name || profile.username || "U")[0].toUpperCase();
+      document.getElementById("avatar").textContent = avatarLetter;
+
+      document.getElementById("fullName").textContent = profile.full_name || profile.username;
+      document.getElementById("username").textContent = "@" + profile.username;
+      document.getElementById("email").textContent = profile.email;
+      document.getElementById("role").textContent = getRoleName(profile.role_id);
+
+      // Load user contributions
+      await loadSOPs(userId);
+      await loadChatbox(userId);
+      await loadFAQs(userId);
+
+      document.getElementById("logoutBtn").addEventListener("click", () => {
+        localStorage.clear();
+        window.location.href = "login.html";
+      });
+    });
+
+    function getRoleName(role_id) {
+      switch (String(role_id)) {
+        case "1": return "Admin";
+        case "2": return "Intern";
+        case "3": return "Part-Timer";
+        case "4": return "Full-Timer";
+        default: return "User";
+      }
+    }
+
+    async function loadSOPs(userId) {
+      try {
+        const res = await fetch(`/api/profile/${userId}/sops`);
+        const data = await res.json();
+        const list = document.getElementById("sopList");
+        list.innerHTML = "";
+
+        if (!data.length) {
+          list.innerHTML = "<li class='list-group-item text-muted'>No SOPs found.</li>";
+          return;
+        }
+
+        data.forEach(sop => {
+          const li = document.createElement("li");
+          li.classList.add("list-group-item");
+          li.innerHTML = `<strong>${sop.title}</strong> — <small>${sop.status}</small>`;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        console.error("Error loading SOPs:", err);
+      }
+    }
+
+    async function loadChatbox(userId) {
+      try {
+        const res = await fetch(`/api/profile/${userId}/chatbox`);
+        const data = await res.json();
+        const list = document.getElementById("chatList");
+        list.innerHTML = "";
+
+        if (!data.length) {
+          list.innerHTML = "<li class='list-group-item text-muted'>No chatbox questions found.</li>";
+          return;
+        }
+
+        data.forEach(q => {
+          const li = document.createElement("li");
+          li.classList.add("list-group-item");
+          li.innerHTML = `<strong>${q.question_text}</strong><br><small>${q.answer_text || "No answer yet"}</small>`;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        console.error("Error loading chatbox:", err);
+      }
+    }
+
+    async function loadFAQs(userId) {
+      try {
+        const res = await fetch(`/api/profile/${userId}/faqs`);
+        const data = await res.json();
+        const list = document.getElementById("faqList");
+        list.innerHTML = "";
+
+        if (!data.length) {
+          list.innerHTML = "<li class='list-group-item text-muted'>No FAQs found.</li>";
+          return;
+        }
+
+        data.forEach(faq => {
+          const li = document.createElement("li");
+          li.classList.add("list-group-item");
+          li.innerHTML = `<strong>${faq.question}</strong><br><small>${faq.answer || "No answer yet"}</small>`;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        console.error("Error loading FAQs:", err);
+      }
+    }
+  </script>
 </body>
 </html>
-
-<script src="js/auth.js"></script>
