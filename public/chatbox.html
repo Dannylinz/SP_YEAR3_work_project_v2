@@ -29,6 +29,12 @@
 
     .admin-panel .card { border-radius: 10px; }
     .form-text { font-size: .8rem; }
+
+    .flow-final-note {
+      font-size: 0.9rem;
+      color: #6c757d;
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
@@ -36,17 +42,18 @@
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
       <div class="container-fluid">
-        
-    <a class="navbar-brand d-flex align-items-center" href="#">
-       <img src="pictures/logo.png" alt="MegaNet Logo"
-       style="height: 40px; width: auto; margin-right: 8px;">
-    </a>
+        <a class="navbar-brand d-flex align-items-center" href="#">
+          <img src="pictures/logo.png" alt="MegaNet Logo"
+               style="height: 40px; width: auto; margin-right: 8px;">
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+          <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navMain">
           <ul class="navbar-nav ms-auto">
             <li class="nav-item"><a class="nav-link active" href="chatbox.html">FAQ</a></li>
             <li class="nav-item"><a class="nav-link" href="index.html">Dashboard</a></li>
-            <li class="nav-item"><a class="nav-link" href="faq.html">Chat Board</a></li> 
+            <li class="nav-item"><a class="nav-link" href="faq.html">Chat Board</a></li>
             <li class="nav-item"><a class="nav-link" href="sop.html">SOP Management</a></li>
             <li class="nav-item"><a class="nav-link" href="profile.html">Profile</a></li>
             <li class="nav-item"><a class="nav-link" href="login.html">Logout</a></li>
@@ -131,7 +138,69 @@
     <footer class="text-center text-muted py-3"><small>&copy; MegaNet</small></footer>
   </div>
 
+  <!-- USER FLOW MODAL -->
+  <div class="modal fade" id="flowModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="flowQuestionTitle">Guided Help</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p id="flowStepText" style="white-space: pre-wrap;"></p>
+          <p id="flowFinalNote" class="flow-final-note d-none">
+            This is the end of the guided conversation. If you're still stuck, please ask Danny or Debrae directly.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button id="flowNoBtn" type="button" class="btn btn-outline-secondary">No</button>
+          <button id="flowYesBtn" type="button" class="btn btn-primary">Yes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN FLOW BUILDER MODAL -->
+  <div class="modal fade" id="flowBuilderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Manage Guided Flow</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2"><strong>Question:</strong> <span id="builderQuestionText"></span></p>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Flow Steps</h6>
+            <button id="builderAddStepBtn" class="btn btn-sm btn-success">Add Step</button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th style="width:5%">ID</th>
+                  <th style="width:40%">Step Text</th>
+                  <th style="width:15%">Yes → Step</th>
+                  <th style="width:15%">No → Step</th>
+                  <th style="width:10%">Final?</th>
+                  <th style="width:15%">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="builderStepsBody">
+                <!-- Rows injected here -->
+              </tbody>
+            </table>
+          </div>
+          <small class="text-muted">
+            Tip: Make your last step a final message like: “Please ask Danny or Debrae directly” and mark it as <strong>Final</strong>.
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
   <script>
     // Basic auth context
     const user = JSON.parse(localStorage.getItem("user"));
@@ -154,10 +223,30 @@
     const qAnswer = document.getElementById("qAnswer");
     const searchBox = document.getElementById("searchBox");
 
+    // Flow modal elements
+    const flowModalEl = document.getElementById("flowModal");
+    const flowModal = new bootstrap.Modal(flowModalEl);
+    const flowQuestionTitle = document.getElementById("flowQuestionTitle");
+    const flowStepText = document.getElementById("flowStepText");
+    const flowFinalNote = document.getElementById("flowFinalNote");
+    const flowYesBtn = document.getElementById("flowYesBtn");
+    const flowNoBtn = document.getElementById("flowNoBtn");
+
+    // Builder modal elements
+    const flowBuilderModalEl = document.getElementById("flowBuilderModal");
+    const flowBuilderModal = new bootstrap.Modal(flowBuilderModalEl);
+    const builderQuestionText = document.getElementById("builderQuestionText");
+    const builderStepsBody = document.getElementById("builderStepsBody");
+    const builderAddStepBtn = document.getElementById("builderAddStepBtn");
+
     // Data state
     let topics = [];
     let currentTopic = null;
     let questions = []; // last loaded for topic
+    let currentFlowQuestion = null;
+    let currentFlowStepId = null;
+    let builderCurrentQuestion = null;
+    let builderSteps = [];
 
     // Admin controls visibility
     if (isAdmin) {
@@ -186,7 +275,7 @@
 
         const pill = document.createElement("span");
         pill.className = "badge text-bg-light topic-pill px-3 py-2";
-        pill.textContent = t.topic_name || t.name; // ✅ display correct name
+        pill.textContent = t.topic_name || t.name;
         if (currentTopic && currentTopic.topic_id === t.topic_id) pill.classList.add("active");
         pill.onclick = () => selectTopic(t);
 
@@ -221,14 +310,16 @@
       currentTopic = t;
       document.querySelectorAll(".topic-pill").forEach(el => el.classList.remove("active"));
       setTimeout(() => {
-        [...document.querySelectorAll(".topic-pill")].find(el => el.textContent === (t.topic_name || t.name))?.classList.add("active");
+        [...document.querySelectorAll(".topic-pill")]
+          .find(el => el.textContent === (t.topic_name || t.name))
+          ?.classList.add("active");
       });
       currentTopicLabel.textContent = `Topic: ${t.topic_name || t.name}`;
       if (isAdmin) adminTopicName.textContent = t.topic_name || t.name;
       await loadQuestions(t.topic_id);
     }
 
-    // ✅ Fixed: Add topic (correct key name)
+    // Add topic
     addTopicBtn.onclick = async () => {
       const topic_name = (newTopicName.value || "").trim();
       if (!topic_name) return alert("Enter topic name.");
@@ -280,7 +371,7 @@
         title.className = "q-title";
         title.innerHTML = `<span class="text-primary">Q${idx + 1}.</span> ${escapeHtml(q.question || "")}`;
         title.onclick = () => {
-          ans.style.display = ans.style.display === "none" ? "block" : "none";
+          ansDiv.style.display = ansDiv.style.display === "none" ? "block" : "none";
         };
 
         const meta = document.createElement("div");
@@ -288,17 +379,27 @@
         meta.className = "q-meta mb-1";
         meta.textContent = `By ${q.username || "Unknown"} • ${when}`;
 
-        const ans = document.createElement("div");
-        ans.className = "q-answer";
-        ans.textContent = q.answer || "";
+        const ansDiv = document.createElement("div");
+        ansDiv.className = "q-answer";
+        ansDiv.textContent = q.answer || "";
+
+        // User flow button
+        const flowBtn = document.createElement("button");
+        flowBtn.className = "btn btn-sm btn-outline-primary mt-2 me-2";
+        flowBtn.textContent = "Start Guided Help";
+        flowBtn.onclick = () => {
+          startGuidedFlow(q);
+        };
 
         card.appendChild(title);
         card.appendChild(meta);
-        card.appendChild(ans);
+        card.appendChild(ansDiv);
+        card.appendChild(flowBtn);
 
+        // Admin controls (edit/delete + manage flow)
         if (isAdmin) {
           const controls = document.createElement("div");
-          controls.className = "mt-2 d-flex gap-2";
+          controls.className = "mt-2 d-flex flex-wrap gap-2";
 
           const editBtn = document.createElement("button");
           editBtn.className = "btn btn-sm btn-outline-warning";
@@ -342,8 +443,16 @@
             await loadQuestions(currentTopic.topic_id);
           };
 
+          const manageFlowBtn = document.createElement("button");
+          manageFlowBtn.className = "btn btn-sm btn-outline-secondary";
+          manageFlowBtn.textContent = "Manage Flow";
+          manageFlowBtn.onclick = () => {
+            openFlowBuilder(q);
+          };
+
           controls.appendChild(editBtn);
           controls.appendChild(delBtn);
+          controls.appendChild(manageFlowBtn);
           card.appendChild(controls);
         }
 
@@ -392,10 +501,279 @@
         .replaceAll("'", "&#039;");
     }
 
+    /* =====================================================
+       USER GUIDED FLOW (YES/NO)
+       ===================================================== */
+    async function startGuidedFlow(question) {
+      currentFlowQuestion = question;
+      flowQuestionTitle.textContent = question.question || "Guided Help";
+      flowFinalNote.classList.add("d-none");
+      flowYesBtn.disabled = false;
+      flowNoBtn.disabled = false;
+
+      try {
+        const res = await fetch(`/api/chatbox/flow/start/${question.question_id}`);
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          alert(data.message || "No guided flow defined for this question yet.");
+          return;
+        }
+        const data = await res.json();
+        const step = data.step;
+        currentFlowStepId = step.step_id;
+        flowStepText.textContent = step.step_text || "";
+        if (step.is_final || (!step.yes_next_step && !step.no_next_step)) {
+          flowYesBtn.disabled = true;
+          flowNoBtn.disabled = true;
+          flowFinalNote.classList.remove("d-none");
+        }
+        flowModal.show();
+      } catch (err) {
+        console.error("❌ startGuidedFlow error:", err);
+        alert("Error starting guided flow.");
+      }
+    }
+
+    async function handleFlowChoice(choice) {
+      if (!currentFlowStepId) return;
+      try {
+        const res = await fetch(`/api/chatbox/flow/next/${currentFlowStepId}/${choice}`);
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          alert(data.message || "Error progressing guided flow.");
+          return;
+        }
+        const data = await res.json();
+        const step = data.step;
+        currentFlowStepId = step.step_id;
+        flowStepText.textContent = step.step_text || "";
+
+        const isEnd = data.end || step.is_final || (!step.yes_next_step && !step.no_next_step);
+        if (isEnd) {
+          flowYesBtn.disabled = true;
+          flowNoBtn.disabled = true;
+          flowFinalNote.classList.remove("d-none");
+        } else {
+          flowYesBtn.disabled = false;
+          flowNoBtn.disabled = false;
+          flowFinalNote.classList.add("d-none");
+        }
+      } catch (err) {
+        console.error("❌ handleFlowChoice error:", err);
+        alert("Error getting next step.");
+      }
+    }
+
+    flowYesBtn.addEventListener("click", () => handleFlowChoice("yes"));
+    flowNoBtn.addEventListener("click", () => handleFlowChoice("no"));
+
+    flowModalEl.addEventListener("hidden.bs.modal", () => {
+      currentFlowStepId = null;
+      currentFlowQuestion = null;
+      flowStepText.textContent = "";
+      flowFinalNote.classList.add("d-none");
+    });
+
+    /* =====================================================
+       ADMIN FLOW BUILDER
+       ===================================================== */
+    async function openFlowBuilder(question) {
+      if (!isAdmin) return;
+      builderCurrentQuestion = question;
+      builderQuestionText.textContent = question.question || "";
+      await loadBuilderSteps(question.question_id);
+      flowBuilderModal.show();
+    }
+
+    async function loadBuilderSteps(question_id) {
+      builderStepsBody.innerHTML = "";
+      builderSteps = [];
+      try {
+        const res = await fetch(`/api/chatbox/flow/${question_id}`);
+        if (!res.ok) {
+          // no steps yet is okay; just empty table
+          return;
+        }
+        builderSteps = await res.json();
+        renderBuilderSteps();
+      } catch (err) {
+        console.error("❌ loadBuilderSteps error:", err);
+      }
+    }
+
+    function renderBuilderSteps() {
+      builderStepsBody.innerHTML = "";
+
+      const stepIds = builderSteps.map(s => s.step_id);
+
+      builderSteps.forEach(step => {
+        const tr = document.createElement("tr");
+
+        // ID
+        const tdId = document.createElement("td");
+        tdId.textContent = step.step_id;
+        tr.appendChild(tdId);
+
+        // Text
+        const tdText = document.createElement("td");
+        const ta = document.createElement("textarea");
+        ta.className = "form-control form-control-sm";
+        ta.rows = 2;
+        ta.value = step.step_text || "";
+        tdText.appendChild(ta);
+        tr.appendChild(tdText);
+
+        // Yes next
+        const tdYes = document.createElement("td");
+        const selYes = document.createElement("select");
+        selYes.className = "form-select form-select-sm";
+        const optNoneYes = document.createElement("option");
+        optNoneYes.value = "";
+        optNoneYes.textContent = "(none)";
+        selYes.appendChild(optNoneYes);
+        stepIds.forEach(id => {
+          const opt = document.createElement("option");
+          opt.value = id;
+          opt.textContent = id;
+          selYes.appendChild(opt);
+        });
+        if (step.yes_next_step) selYes.value = step.yes_next_step;
+        tdYes.appendChild(selYes);
+        tr.appendChild(tdYes);
+
+        // No next
+        const tdNo = document.createElement("td");
+        const selNo = document.createElement("select");
+        selNo.className = "form-select form-select-sm";
+        const optNoneNo = document.createElement("option");
+        optNoneNo.value = "";
+        optNoneNo.textContent = "(none)";
+        selNo.appendChild(optNoneNo);
+        stepIds.forEach(id => {
+          const opt = document.createElement("option");
+          opt.value = id;
+          opt.textContent = id;
+          selNo.appendChild(opt);
+        });
+        if (step.no_next_step) selNo.value = step.no_next_step;
+        tdNo.appendChild(selNo);
+        tr.appendChild(tdNo);
+
+        // Final?
+        const tdFinal = document.createElement("td");
+        const finalCheck = document.createElement("input");
+        finalCheck.type = "checkbox";
+        finalCheck.className = "form-check-input";
+        finalCheck.checked = !!step.is_final;
+        tdFinal.appendChild(finalCheck);
+        tr.appendChild(tdFinal);
+
+        // Actions
+        const tdActions = document.createElement("td");
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "btn btn-sm btn-primary me-1 mb-1";
+        saveBtn.textContent = "Save";
+        saveBtn.onclick = async () => {
+          await saveBuilderStep(step.step_id, ta.value, selYes.value, selNo.value, finalCheck.checked);
+        };
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn btn-sm btn-outline-danger mb-1";
+        delBtn.textContent = "Delete";
+        delBtn.onclick = async () => {
+          if (!confirm("Delete this step?")) return;
+          await deleteBuilderStep(step.step_id);
+        };
+
+        tdActions.appendChild(saveBtn);
+        tdActions.appendChild(delBtn);
+        tr.appendChild(tdActions);
+
+        builderStepsBody.appendChild(tr);
+      });
+    }
+
+    async function saveBuilderStep(step_id, text, yesId, noId, isFinal) {
+      if (!text.trim()) {
+        alert("Step text cannot be empty.");
+        return;
+      }
+      try {
+        const r = await fetch(`/api/chatbox/flow/${step_id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            step_text: text.trim(),
+            yes_next_step: yesId || null,
+            no_next_step: noId || null,
+            is_final: isFinal,
+            role_id: user.role_id
+          })
+        });
+        if (!r.ok) {
+          const e = await r.json().catch(()=>({message:"Error"}));
+          alert(e.message || "Failed to update step.");
+          return;
+        }
+        await loadBuilderSteps(builderCurrentQuestion.question_id);
+      } catch (err) {
+        console.error("❌ saveBuilderStep error:", err);
+        alert("Error saving step.");
+      }
+    }
+
+    async function deleteBuilderStep(step_id) {
+      try {
+        const r = await fetch(`/api/chatbox/flow/${step_id}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role_id: user.role_id })
+        });
+        if (!r.ok) {
+          const e = await r.json().catch(()=>({message:"Error"}));
+          alert(e.message || "Failed to delete step.");
+          return;
+        }
+        await loadBuilderSteps(builderCurrentQuestion.question_id);
+      } catch (err) {
+        console.error("❌ deleteBuilderStep error:", err);
+        alert("Error deleting step.");
+      }
+    }
+
+    builderAddStepBtn.addEventListener("click", async () => {
+      if (!builderCurrentQuestion) return;
+      const text = prompt("Enter step text (e.g., 'Can you access it now?')");
+      if (!text) return;
+      try {
+        const r = await fetch("/api/chatbox/flow", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question_id: builderCurrentQuestion.question_id,
+            step_text: text.trim(),
+            yes_next_step: null,
+            no_next_step: null,
+            is_final: false,
+            role_id: user.role_id
+          })
+        });
+        if (!r.ok) {
+          const e = await r.json().catch(()=>({message:"Error"}));
+          alert(e.message || "Failed to add step.");
+          return;
+        }
+        await loadBuilderSteps(builderCurrentQuestion.question_id);
+      } catch (err) {
+        console.error("❌ builderAddStep error:", err);
+        alert("Error adding step.");
+      }
+    });
+
     // Boot
     loadTopics();
   </script>
+
+  <script src="js/auth.js"></script>
 </body>
 </html>
-
-<script src="js/auth.js"></script>

@@ -210,6 +210,22 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'ChatboxQuestion' created");
 
+    // ----------------------------
+    // ChatboxFlowStep Table (for branching Yes/No flows)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ChatboxFlowStep (
+        step_id INT AUTO_INCREMENT PRIMARY KEY,
+        question_id INT NOT NULL,
+        step_text TEXT NOT NULL,
+        yes_next_step INT DEFAULT NULL,
+        no_next_step INT DEFAULT NULL,
+        is_final BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (question_id) REFERENCES ChatboxQuestion(question_id)
+      );
+    `);
+    console.log("✅ Table 'ChatboxFlowStep' created");
+
     console.log("🎉 All MAIN tables created successfully (User/Role handled by meganet_auth DB)!");
     process.exit(0);
 

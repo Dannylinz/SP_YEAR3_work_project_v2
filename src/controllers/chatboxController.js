@@ -261,7 +261,10 @@ exports.deleteQuestion = async (req, res) => {
       return res.status(400).json({ message: "Missing question id" });
     }
 
-    const [r] = await pool.query(`DELETE FROM ChatboxQuestion WHERE question_id = ?`, [id]);
+    const [r] = await pool.query(
+      `DELETE FROM ChatboxQuestion WHERE question_id = ?`,
+      [id]
+    );
 
     if (r.affectedRows === 0) {
       console.warn("⚠️ [deleteQuestion] Question not found:", id);
@@ -272,6 +275,304 @@ exports.deleteQuestion = async (req, res) => {
     res.json({ message: "Question deleted successfully" });
   } catch (err) {
     console.error("❌ [deleteQuestion] DB error:", err);
+    res.status(500).json({ message: "Database error", error: err });
+  }
+};
+
+/* =========================================================
+   FLOW STEPS (BRANCHING YES/NO LOGIC)
+   ========================================================= */
+
+// Get all steps for a question (for admin builder)
+exports.getFlowStepsByQuestion = async (req, res) => {
+  const { question_id } = req.params;
+  console.log("🔹 [getFlowStepsByQuestion] question_id:", question_id);
+
+  if (!question_id) {
+    return res.status(400).json({ message: "Missing question_id" });
+  }
+
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        step_id,
+        question_id,
+        step_text,
+        yes_next_step,
+        no_next_step,
+        is_final,
+        created_at
+      FROM ChatboxFlowStep
+      WHERE question_id = ?
+      ORDER BY step_id ASC
+      `,
+      [question_id]
+    );
+
+    console.log(`✅ [getFlowStepsByQuestion] Found ${rows.length} steps`);
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error("❌ [getFlowStepsByQuestion] DB error:", err);
+    res.status(500).json({ message: "Database error", error: err });
+  }
+};
+
+// Create a new flow step
+exports.createFlowStep = async (req, res) => {
+  console.log("🔹 [createFlowStep] Body:", req.body);
+  try {
+    const { question_id, step_text, yes_next_step, no_next_step, is_final, role_id } = req.body || {};
+
+    if (!isAdmin(role_id)) {
+      console.warn("🚫 [createFlowStep] Forbidden — not admin:", role_id);
+      return res.status(403).json({ message: "Forbidden: admin only" });
+    }
+
+    if (!question_id || !step_text) {
+      console.warn("⚠️ [createFlowStep] Missing fields:", { question_id, step_text });
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    const [result] = await pool.query(
+      `
+      INSERT INTO ChatboxFlowStep
+        (question_id, step_text, yes_next_step, no_next_step, is_final, created_at)
+      VALUES (?, ?, ?, ?, ?, NOW())
+      `,
+      [
+        question_id,
+        step_text,
+        yes_next_step || null,
+        no_next_step || null,
+        !!is_final
+      ]
+    );
+
+    const [inserted] = await pool.query(
+      `SELECT * FROM ChatboxFlowStep WHERE step_id = ?`,
+      [result.insertId]
+    );
+
+    console.log("✅ [createFlowStep] Step inserted, ID:", result.insertId);
+    res.status(201).json({
+      message: "Flow step created successfully",
+      step: inserted[0],
+    });
+  } catch (err) {
+    console.error("❌ [createFlowStep] DB error:", err);
+    res.status(500).json({ message: "Database error", error: err });
+  }
+};
+
+// Update a flow step
+exports.updateFlowStep = async (req, res) => {
+  console.log("🔹 [updateFlowStep] Params:", req.params, "Body:", req.body);
+  try {
+    const { step_id } = req.params;
+    const { step_text, yes_next_step, no_next_step, is_final, role_id } = req.body || {};
+
+    if (!isAdmin(role_id)) {
+      console.warn("🚫 [updateFlowStep] Forbidden — not admin:", role_id);
+      return res.status(403).json({ message: "Forbidden: admin only" });
+    }
+
+    if (!step_id || !step_text) {
+      console.warn("⚠️ [updateFlowStep] Missing fields:", { step_id, step_text });
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    const [r] = await pool.query(
+      `
+      UPDATE ChatboxFlowStep
+      SET step_text = ?, 
+          yes_next_step = ?, 
+          no_next_step = ?, 
+          is_final = ?
+      WHERE step_id = ?
+      `,
+      [
+        step_text,
+        yes_next_step || null,
+        no_next_step || null,
+        !!is_final,
+        step_id
+      ]
+    );
+
+    if (r.affectedRows === 0) {
+      console.warn("⚠️ [updateFlowStep] Step not found:", step_id);
+      return res.status(404).json({ message: "Step not found" });
+    }
+
+    const [updated] = await pool.query(
+      `SELECT * FROM ChatboxFlowStep WHERE step_id = ?`,
+      [step_id]
+    );
+
+    console.log("✅ [updateFlowStep] Updated successfully:", step_id);
+    res.json({
+      message: "Flow step updated successfully",
+      step: updated[0],
+    });
+  } catch (err) {
+    console.error("❌ [updateFlowStep] DB error:", err);
+    res.status(500).json({ message: "Database error", error: err });
+  }
+};
+
+// Delete a flow step
+exports.deleteFlowStep = async (req, res) => {
+  console.log("🔹 [deleteFlowStep] Params:", req.params, "Body:", req.body);
+  try {
+    const { step_id } = req.params;
+    const { role_id } = req.body || {};
+
+    if (!isAdmin(role_id)) {
+      console.warn("🚫 [deleteFlowStep] Forbidden — not admin:", role_id);
+      return res.status(403).json({ message: "Forbidden: admin only" });
+    }
+
+    if (!step_id) {
+      console.warn("⚠️ [deleteFlowStep] Missing step_id");
+      return res.status(400).json({ message: "Missing step_id" });
+    }
+
+    const [r] = await pool.query(
+      `DELETE FROM ChatboxFlowStep WHERE step_id = ?`,
+      [step_id]
+    );
+
+    if (r.affectedRows === 0) {
+      console.warn("⚠️ [deleteFlowStep] Step not found:", step_id);
+      return res.status(404).json({ message: "Step not found" });
+    }
+
+    console.log("✅ [deleteFlowStep] Deleted successfully:", step_id);
+    res.json({ message: "Flow step deleted successfully" });
+  } catch (err) {
+    console.error("❌ [deleteFlowStep] DB error:", err);
+    res.status(500).json({ message: "Database error", error: err });
+  }
+};
+
+// Get starting step for a question (user flow)
+exports.getStartStep = async (req, res) => {
+  const { question_id } = req.params;
+  console.log("🔹 [getStartStep] question_id:", question_id);
+
+  if (!question_id) {
+    return res.status(400).json({ message: "Missing question_id" });
+  }
+
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        step_id,
+        question_id,
+        step_text,
+        yes_next_step,
+        no_next_step,
+        is_final
+      FROM ChatboxFlowStep
+      WHERE question_id = ?
+      ORDER BY step_id ASC
+      LIMIT 1
+      `,
+      [question_id]
+    );
+
+    if (rows.length === 0) {
+      console.warn("⚠️ [getStartStep] No steps configured for question:", question_id);
+      return res.status(404).json({ message: "No guided flow defined for this question" });
+    }
+
+    console.log("✅ [getStartStep] Returning first step:", rows[0].step_id);
+    res.json({ step: rows[0] });
+  } catch (err) {
+    console.error("❌ [getStartStep] DB error:", err);
+    res.status(500).json({ message: "Database error", error: err });
+  }
+};
+
+// Get next step given a step_id and yes/no choice
+exports.getNextStep = async (req, res) => {
+  const { step_id, choice } = req.params;
+  console.log("🔹 [getNextStep] step_id:", step_id, "choice:", choice);
+
+  if (!step_id || !choice) {
+    return res.status(400).json({ message: "Missing step_id or choice" });
+  }
+
+  const normalizedChoice = String(choice).toLowerCase();
+
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        step_id,
+        question_id,
+        step_text,
+        yes_next_step,
+        no_next_step,
+        is_final
+      FROM ChatboxFlowStep
+      WHERE step_id = ?
+      `,
+      [step_id]
+    );
+
+    if (rows.length === 0) {
+      console.warn("⚠️ [getNextStep] Current step not found:", step_id);
+      return res.status(404).json({ message: "Current step not found" });
+    }
+
+    const current = rows[0];
+    let nextId = null;
+
+    if (normalizedChoice === "yes") {
+      nextId = current.yes_next_step;
+    } else if (normalizedChoice === "no") {
+      nextId = current.no_next_step;
+    } else {
+      return res.status(400).json({ message: "Choice must be 'yes' or 'no'" });
+    }
+
+    if (!nextId) {
+      // No further step; treat as end of flow
+      console.log("ℹ️ [getNextStep] No next step; end of flow.");
+      return res.json({
+        step: current,
+        end: true,
+        message: "No further steps; this is the end of the guided flow.",
+      });
+    }
+
+    const [nextRows] = await pool.query(
+      `
+      SELECT 
+        step_id,
+        question_id,
+        step_text,
+        yes_next_step,
+        no_next_step,
+        is_final
+      FROM ChatboxFlowStep
+      WHERE step_id = ?
+      `,
+      [nextId]
+    );
+
+    if (nextRows.length === 0) {
+      console.warn("⚠️ [getNextStep] Next step not found:", nextId);
+      return res.status(404).json({ message: "Next step not found" });
+    }
+
+    console.log("✅ [getNextStep] Returning step:", nextRows[0].step_id);
+    res.json({ step: nextRows[0] });
+  } catch (err) {
+    console.error("❌ [getNextStep] DB error:", err);
     res.status(500).json({ message: "Database error", error: err });
   }
 };
