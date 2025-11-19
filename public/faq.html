@@ -135,7 +135,10 @@
           <li class="nav-item"><a class="nav-link" href="sop.html">SOP Management</a></li>
           <li class="nav-item"><a class="nav-link" href="chatbox.html">FAQ</a></li>
           <li class="nav-item"><a class="nav-link" href="profile.html">Profile</a></li>
-          <li class="nav-item"><a class="nav-link" href="login.html">Logout</a></li>
+
+          <!-- 🔴 FIXED LOGOUT BUTTON -->
+          <li class="nav-item"><a class="nav-link" href="#" onclick="logout()">Logout</a></li>
+
         </ul>
       </div>
     </div>
@@ -400,8 +403,19 @@
 
     // 🚀 Initial load
     loadMessages("", true);
+
+    /* ---------------------------------------------------
+      🔴 REAL LOGOUT FUNCTION (NEW)
+    --------------------------------------------------- */
+    function logout() {
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = "login.html";
+    }
+
   </script>
+
+  <script src="js/auth.js"></script>
+
 </body>
 </html>
-
-<script src="js/auth.js"></script>

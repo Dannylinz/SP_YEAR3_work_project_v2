@@ -39,6 +39,7 @@
 </head>
 <body>
   <div class="page-wrap">
+
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
       <div class="container-fluid">
@@ -46,9 +47,11 @@
           <img src="pictures/logo.png" alt="MegaNet Logo"
                style="height: 40px; width: auto; margin-right: 8px;">
         </a>
+
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
           <span class="navbar-toggler-icon"></span>
         </button>
+
         <div class="collapse navbar-collapse" id="navMain">
           <ul class="navbar-nav ms-auto">
             <li class="nav-item"><a class="nav-link active" href="chatbox.html">FAQ</a></li>
@@ -56,7 +59,12 @@
             <li class="nav-item"><a class="nav-link" href="faq.html">Chat Board</a></li>
             <li class="nav-item"><a class="nav-link" href="sop.html">SOP Management</a></li>
             <li class="nav-item"><a class="nav-link" href="profile.html">Profile</a></li>
-            <li class="nav-item"><a class="nav-link" href="login.html">Logout</a></li>
+
+            <!-- ⭐ Updated Logout Button -->
+            <li class="nav-item">
+              <a class="nav-link" href="#" onclick="logout()">Logout</a>
+            </li>
+
           </ul>
         </div>
       </div>
@@ -242,7 +250,7 @@
     // Data state
     let topics = [];
     let currentTopic = null;
-    let questions = []; // last loaded for topic
+    let questions = []; 
     let currentFlowQuestion = null;
     let currentFlowStepId = null;
     let builderCurrentQuestion = null;
@@ -314,12 +322,12 @@
           .find(el => el.textContent === (t.topic_name || t.name))
           ?.classList.add("active");
       });
+
       currentTopicLabel.textContent = `Topic: ${t.topic_name || t.name}`;
       if (isAdmin) adminTopicName.textContent = t.topic_name || t.name;
       await loadQuestions(t.topic_id);
     }
 
-    // Add topic
     addTopicBtn.onclick = async () => {
       const topic_name = (newTopicName.value || "").trim();
       if (!topic_name) return alert("Enter topic name.");
@@ -338,7 +346,6 @@
       await loadTopics();
     };
 
-    // Load questions by topic
     async function loadQuestions(topic_id) {
       console.log("📡 Fetching questions for topic:", topic_id);
       const res = await fetch(`/api/chatbox/questions?topic_id=${encodeURIComponent(topic_id)}`);
@@ -383,7 +390,6 @@
         ansDiv.className = "q-answer";
         ansDiv.textContent = q.answer || "";
 
-        // User flow button
         const flowBtn = document.createElement("button");
         flowBtn.className = "btn btn-sm btn-outline-primary mt-2 me-2";
         flowBtn.textContent = "Start Guided Help";
@@ -396,7 +402,6 @@
         card.appendChild(ansDiv);
         card.appendChild(flowBtn);
 
-        // Admin controls (edit/delete + manage flow)
         if (isAdmin) {
           const controls = document.createElement("div");
           controls.className = "mt-2 d-flex flex-wrap gap-2";
@@ -461,7 +466,6 @@
       });
     }
 
-    // Add question (admin)
     addQuestionBtn.onclick = async () => {
       if (!currentTopic) return alert("Select a topic first.");
       const ques = (qQuestion.value || "").trim();
@@ -489,7 +493,6 @@
       await loadQuestions(currentTopic.topic_id);
     };
 
-    // Search
     searchBox.addEventListener("input", () => renderQuestions(questions));
 
     function escapeHtml(unsafe = "") {
@@ -501,9 +504,6 @@
         .replaceAll("'", "&#039;");
     }
 
-    /* =====================================================
-       USER GUIDED FLOW (YES/NO)
-       ===================================================== */
     async function startGuidedFlow(question) {
       currentFlowQuestion = question;
       flowQuestionTitle.textContent = question.question || "Guided Help";
@@ -574,9 +574,6 @@
       flowFinalNote.classList.add("d-none");
     });
 
-    /* =====================================================
-       ADMIN FLOW BUILDER
-       ===================================================== */
     async function openFlowBuilder(question) {
       if (!isAdmin) return;
       builderCurrentQuestion = question;
@@ -590,10 +587,7 @@
       builderSteps = [];
       try {
         const res = await fetch(`/api/chatbox/flow/${question_id}`);
-        if (!res.ok) {
-          // no steps yet is okay; just empty table
-          return;
-        }
+        if (!res.ok) return;
         builderSteps = await res.json();
         renderBuilderSteps();
       } catch (err) {
@@ -609,12 +603,10 @@
       builderSteps.forEach(step => {
         const tr = document.createElement("tr");
 
-        // ID
         const tdId = document.createElement("td");
         tdId.textContent = step.step_id;
         tr.appendChild(tdId);
 
-        // Text
         const tdText = document.createElement("td");
         const ta = document.createElement("textarea");
         ta.className = "form-control form-control-sm";
@@ -623,7 +615,6 @@
         tdText.appendChild(ta);
         tr.appendChild(tdText);
 
-        // Yes next
         const tdYes = document.createElement("td");
         const selYes = document.createElement("select");
         selYes.className = "form-select form-select-sm";
@@ -641,7 +632,6 @@
         tdYes.appendChild(selYes);
         tr.appendChild(tdYes);
 
-        // No next
         const tdNo = document.createElement("td");
         const selNo = document.createElement("select");
         selNo.className = "form-select form-select-sm";
@@ -659,7 +649,6 @@
         tdNo.appendChild(selNo);
         tr.appendChild(tdNo);
 
-        // Final?
         const tdFinal = document.createElement("td");
         const finalCheck = document.createElement("input");
         finalCheck.type = "checkbox";
@@ -668,7 +657,6 @@
         tdFinal.appendChild(finalCheck);
         tr.appendChild(tdFinal);
 
-        // Actions
         const tdActions = document.createElement("td");
         const saveBtn = document.createElement("button");
         saveBtn.className = "btn btn-sm btn-primary me-1 mb-1";
@@ -769,6 +757,13 @@
         alert("Error adding step.");
       }
     });
+
+    // ⭐ REAL LOGOUT FUNCTION
+    function logout() {
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = "login.html";
+    }
 
     // Boot
     loadTopics();

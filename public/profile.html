@@ -73,25 +73,30 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
   <div class="container-fluid">
     <a class="navbar-brand d-flex align-items-center" href="#">
-  <img src="pictures/logo.png" alt="MegaNet Logo"
-       style="height: 40px; width: auto; margin-right: 8px;">
-</a>
+      <img src="pictures/logo.png" alt="MegaNet Logo"
+           style="height: 40px; width: auto; margin-right: 8px;">
+    </a>
 
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav ms-auto">
-          <li class="nav-item"><a class="nav-link active" href="profile.html">Profile</a></li>
-          <li class="nav-item"><a class="nav-link" href="index.html">Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link" href="sop.html">SOP Management</a></li>
-          <li class="nav-item"><a class="nav-link" href="chatbox.html">FAQ</a></li>
-          <li class="nav-item"><a class="nav-link" href="faq.html">Chat Board</a></li>
-          <li class="nav-item"><a class="nav-link" href="login.html">Logout</a></li>
-        </ul>
-      </div>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+
+        <li class="nav-item"><a class="nav-link active" href="profile.html">Profile</a></li>
+        <li class="nav-item"><a class="nav-link" href="index.html">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="sop.html">SOP Management</a></li>
+        <li class="nav-item"><a class="nav-link" href="chatbox.html">FAQ</a></li>
+        <li class="nav-item"><a class="nav-link" href="faq.html">Chat Board</a></li>
+
+        <!-- 🔴 FIXED LOGOUT BUTTON -->
+        <li class="nav-item"><a class="nav-link" href="#" onclick="logout()">Logout</a></li>
+
+      </ul>
     </div>
-  </nav>
+  </div>
+</nav>
 
 <body>
   <div class="container">
@@ -122,6 +127,7 @@
         <h4>Your MESSAGEs</h4>
         <ul id="faqList" class="list-group"></ul>
       </div>
+
     </div>
   </div>
 
@@ -158,8 +164,7 @@
       await loadFAQs(userId);
 
       document.getElementById("logoutBtn").addEventListener("click", () => {
-        localStorage.clear();
-        window.location.href = "login.html";
+        logout();
       });
     });
 
@@ -240,6 +245,15 @@
       } catch (err) {
         console.error("Error loading FAQs:", err);
       }
+    }
+
+    /* ------------------------------------------------
+       🔴 REAL LOGOUT FUNCTION (NEW)
+    ------------------------------------------------ */
+    function logout() {
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = "login.html";
     }
   </script>
 </body>

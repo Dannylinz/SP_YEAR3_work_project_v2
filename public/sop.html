@@ -27,7 +27,7 @@
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
    <div class="container-fluid">
      <a class="navbar-brand d-flex align-items-center" href="#">
-   <img src="pictures/logo.png" alt="MegaNet Logo"
+       <img src="pictures/logo.png" alt="MegaNet Logo"
        style="height: 40px; width: auto; margin-right: 8px;">
      </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -40,7 +40,10 @@
           <li class="nav-item"><a class="nav-link" href="faq.html">Chat Board</a></li>
           <li class="nav-item"><a class="nav-link" href="chatbox.html">FAQ</a></li>
           <li class="nav-item"><a class="nav-link" href="profile.html">Profile</a></li>
-          <li class="nav-item"><a class="nav-link" href="login.html">Logout</a></li>
+
+          <!-- 🔴 FIXED LOGOUT BUTTON -->
+          <li class="nav-item"><a class="nav-link" href="#" onclick="logout()">Logout</a></li>
+
         </ul>
       </div>
     </div>
@@ -338,7 +341,18 @@
       loadSOPs();
       filterCategory.addEventListener("change", renderSOPs);
     });
+
+    /* ---------------------------------------------------
+      🔴 REAL LOGOUT FUNCTION (NEW)
+    --------------------------------------------------- */
+    function logout() {
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = "login.html";
+    }
+
   </script>
+
 </body>
 </html>
 
