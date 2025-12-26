@@ -11,6 +11,7 @@ const faqRoutes = require("./src/routes/faqRoutes");
 const chatboxRoutes = require("./src/routes/chatboxRoutes");
 const authRoutes = require("./src/routes/authRoutes");
 const profileRoutes = require("./src/routes/profileRoutes");
+const leaveRoutes = require("./src/routes/leaveRoutes");
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use("/api/faqs", faqRoutes);
 app.use("/api/chatbox", chatboxRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/leaves", leaveRoutes);
 // ----------------------------
 app.use("/pictures", express.static(path.join(__dirname, "pictures")));
 // Health check

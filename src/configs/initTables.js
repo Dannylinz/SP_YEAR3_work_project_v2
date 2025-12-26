@@ -144,7 +144,7 @@ const pool = require("../services/db");
     await pool.query(`
       CREATE TABLE IF NOT EXISTS Attachment (
         attachment_id INT AUTO_INCREMENT PRIMARY KEY,
-        parent_type ENUM('faq','sop','procedure_instance','project'),
+        parent_type ENUM('faq','sop','procedure_instance','project','leave'),
         parent_id INT,
         filename VARCHAR(255),
         storage_path VARCHAR(255),
@@ -159,7 +159,7 @@ const pool = require("../services/db");
     await pool.query(`
       CREATE TABLE IF NOT EXISTS Comment (
         comment_id INT AUTO_INCREMENT PRIMARY KEY,
-        parent_type ENUM('sop','faq','project','procedure_instance'),
+        parent_type ENUM('sop','faq','project','procedure_instance','leave'),
         parent_id INT,
         user_id INT,
         content TEXT,
@@ -211,7 +211,7 @@ const pool = require("../services/db");
     console.log("✅ Table 'ChatboxQuestion' created");
 
     // ----------------------------
-    // ChatboxFlowStep Table (for branching Yes/No flows)
+    // ChatboxFlowStep Table (Yes/No branching)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ChatboxFlowStep (
         step_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -226,11 +226,55 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'ChatboxFlowStep' created");
 
-    console.log("🎉 All MAIN tables created successfully (User/Role handled by meganet_auth DB)!");
+    // ----------------------------
+    // ----------------------------
+    // LEAVE MANAGEMENT TABLES
+    // ----------------------------
+
+    // Leave Types Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS LeaveType (
+        leave_type_id INT AUTO_INCREMENT PRIMARY KEY,
+        type_name VARCHAR(50) UNIQUE,
+        description TEXT
+      );
+    `);
+    console.log("✅ Table 'LeaveType' created");
+
+    // Leave Records Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS LeaveRecord (
+        leave_id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        leave_type_id INT NOT NULL,
+        leave_date DATE NOT NULL,
+        reason TEXT,
+        mc_file VARCHAR(255),
+        status ENUM('pending','approved','rejected') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        approved_by INT,
+        approved_at TIMESTAMP NULL,
+        FOREIGN KEY (leave_type_id) REFERENCES LeaveType(leave_type_id)
+      );
+    `);
+    console.log("✅ Table 'LeaveRecord' created");
+
+    // Leave Balance Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS LeaveBalance (
+        user_id INT PRIMARY KEY,
+        total_days INT DEFAULT 21,
+        used_days INT DEFAULT 0,
+        remaining_days INT DEFAULT 21
+      );
+    `);
+    console.log("✅ Table 'LeaveBalance' created");
+
+    console.log("🎉 All MAIN + Leave tables created successfully!");
     process.exit(0);
 
   } catch (err) {
-    console.error("❌ Error creating MAIN tables:", err);
+    console.error("❌ Error creating tables:", err);
     process.exit(1);
   }
 })();
