@@ -13,8 +13,9 @@ const upload = multer({ storage });
 
 // Routes
 router.get("/", leaveController.getLeaves);
-router.post("/", leaveController.submitLeave);
+router.post("/", upload.single("mc"), leaveController.submitLeave);
 router.put("/:leave_id/status", leaveController.updateLeaveStatus);
 router.post("/:leave_id/mc", upload.single("mc"), leaveController.uploadMC);
+router.put("/:leave_id/status", leaveController.updateLeaveStatus);
 
 module.exports = router;

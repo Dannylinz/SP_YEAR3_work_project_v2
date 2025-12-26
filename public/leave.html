@@ -40,13 +40,32 @@
     .badge-box span {
       margin-right: 6px;
     }
+    
+    #adminControls .btn-warning {
+      font-weight: 600;
+      border: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* Notification Styling */
+    .notif-dropdown {
+      width: 300px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .notif-item {
+      border-bottom: 1px solid #f1f1f1;
+      padding: 10px;
+      font-size: 0.85rem;
+    }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-unread { background-color: #f0f7ff; }
   </style>
 </head>
 
 <body>
 <div class="page-wrap">
 
-  <!-- NAVBAR -->
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container-fluid">
       <a class="navbar-brand d-flex align-items-center" href="#">
@@ -70,18 +89,31 @@
     </div>
   </nav>
 
-  <!-- CONTENT -->
   <div class="content container py-4">
 
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h4 class="mb-0">📅 Leave & MC Calendar</h4>
-      <div class="badge-box">
-        <span id="userBadge" class="badge bg-primary"></span>
+      <div class="badge-box d-flex align-items-center">
+        
+        <div class="dropdown me-2">
+          <button class="btn btn-light position-relative border shadow-sm" id="notifBtn" data-bs-toggle="dropdown" aria-expanded="false">
+            🔔 <span id="notifCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end notif-dropdown shadow" aria-labelledby="notifBtn">
+            <li><h6 class="dropdown-header">Notifications</h6></li>
+            <div id="notifItems">
+              <li><span class="dropdown-item text-muted">No new alerts</span></li>
+            </div>
+          </ul>
+        </div>
+
+        <div id="adminControls"></div> 
+        <span id="userBadge" class="badge bg-primary ms-2"></span>
         <span id="leaveBalance" class="badge bg-success"></span>
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel shadow-sm">
       <div id="calendar"></div>
     </div>
 
@@ -92,7 +124,6 @@
   </footer>
 </div>
 
-<!-- LEAVE MODAL -->
 <div class="modal fade" id="leaveModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -131,7 +162,6 @@
   </div>
 </div>
 
-<!-- SCRIPTS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 
@@ -140,72 +170,156 @@
 const user = JSON.parse(localStorage.getItem("user"));
 if (!user) window.location.href = "login.html";
 
-const isWriter = ["1", "4"].includes(String(user.role_id)); // Admin & Full-timer
+const isWriter = ["1", "4"].includes(String(user.role_id)); 
+const isSystemAdmin = String(user.role_id) === "1";
 
 document.getElementById("userBadge").textContent =
-  `${user.username} (${user.role_id == 1 ? "Admin" : user.role_id == 4 ? "Full-Timer" : "Read Only"})`;
+  `${user.username} (${user.role_id == 1 ? "Admin" : user.role_id == 4 ? "Full-Timer" : "Staff"})`;
+
+if (isSystemAdmin) {
+  document.getElementById("adminControls").innerHTML = 
+    `<a href="leave-admin.html" class="btn btn-warning btn-sm shadow-sm">🛡️ Manage Requests (Admin)</a>`;
+}
 
 /* ================= CALENDAR ================= */
 let selectedDate = null;
 let leaveModal = new bootstrap.Modal(document.getElementById("leaveModal"));
 
 document.addEventListener("DOMContentLoaded", () => {
-  const calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
+  const calendarEl = document.getElementById("calendar");
+  const calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: "dayGridMonth",
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek'
+    },
     dateClick: info => onDateClick(info.dateStr),
     events: loadLeaves
   });
   calendar.render();
   loadLeaveBalance();
+  loadNotifications(); // Load alerts on start
 });
 
 function onDateClick(date) {
   if (!isWriter) {
-    alert("You have read-only access.");
+    alert("Read-only access: Regular staff cannot apply for leave via this portal.");
     return;
   }
   selectedDate = date;
   leaveModal.show();
 }
 
-/* ================= API ================= */
+/* ================= NOTIFICATIONS ================= */
+async function loadNotifications() {
+  try {
+    const res = await fetch(`/api/notifications/${user.user_id}`);
+    const data = await res.json();
+    
+    const unread = data.filter(n => !n.is_read);
+    const badge = document.getElementById("notifCount");
+    
+    if (unread.length > 0) {
+      badge.textContent = unread.length;
+      badge.style.display = "block";
+    } else {
+      badge.style.display = "none";
+    }
+
+    const list = document.getElementById("notifItems");
+    if (data.length === 0) {
+      list.innerHTML = '<li><span class="dropdown-item text-muted small">No notifications</span></li>';
+      return;
+    }
+
+    list.innerHTML = data.map(n => `
+      <li class="notif-item ${n.is_read ? '' : 'notif-unread'}">
+        <div class="px-3">
+          <div class="${n.is_read ? 'text-muted' : 'fw-bold'}">${n.message}</div>
+          <small class="text-muted">${new Date(n.created_at).toLocaleString()}</small>
+        </div>
+      </li>
+    `).join('');
+  } catch (err) {
+    console.error("Notif Error:", err);
+  }
+}
+
+// Mark notifications as read when clicking the bell
+document.getElementById('notifBtn').addEventListener('click', async () => {
+  try {
+    await fetch(`/api/notifications/${user.user_id}/read`, { method: 'PUT' });
+    // Small delay to let user see unread state before badge vanishes
+    setTimeout(() => {
+      document.getElementById("notifCount").style.display = "none";
+    }, 1000);
+  } catch (err) {
+    console.error("Read Error:", err);
+  }
+});
+
+/* ================= API CALLS ================= */
 async function submitLeave() {
+  if (!selectedDate) return alert("Please select a date.");
+
   const fd = new FormData();
   fd.append("user_id", user.user_id);
   fd.append("username", user.username);
   fd.append("leave_date", selectedDate);
-  fd.append("leave_type", leaveType.value);
-  fd.append("reason", reason.value);
-  if (mcFile.files[0]) fd.append("mc", mcFile.files[0]);
+  fd.append("leave_type", document.getElementById("leaveType").value);
+  fd.append("reason", document.getElementById("reason").value);
+  
+  const fileInput = document.getElementById("mcFile");
+  if (fileInput.files[0]) {
+    fd.append("mc", fileInput.files[0]);
+  }
 
-  await fetch("/api/leaves", { method: "POST", body: fd });
-  location.reload();
+  try {
+    const res = await fetch("/api/leaves", { method: "POST", body: fd });
+    if (res.ok) {
+      alert("Success: Leave request submitted.");
+      location.reload();
+    } else {
+      const err = await res.json();
+      alert("Submission Error: " + err.message);
+    }
+  } catch (error) {
+    console.error("Network Error:", error);
+  }
 }
 
 async function loadLeaves(info, success) {
-  const res = await fetch(`/api/leaves?user_id=${user.user_id}&role_id=${user.role_id}`);
-  const data = await res.json();
+  try {
+    const res = await fetch(`/api/leaves?user_id=${user.user_id}&role_id=${user.role_id}`);
+    const data = await res.json();
 
-  success(data.map(l => ({
-    title: `${l.leave_type} (${l.status})`,
-    start: l.leave_date,
-    color:
-      l.status === "approved" ? "green" :
-      l.status === "rejected" ? "red" : "orange"
-  })));
+    const events = data.map(l => ({
+      title: `${l.leave_type} (${l.status})`,
+      start: l.leave_date,
+      color: l.status === "approved" ? "#28a745" : (l.status === "rejected" ? "#dc3545" : "#fd7e14")
+    }));
+    success(events);
+  } catch (err) {
+    console.error("Fetch Error:", err);
+  }
 }
 
 async function loadLeaveBalance() {
-  const res = await fetch(`/api/leaves/balance/${user.user_id}`);
-  const data = await res.json();
-  document.getElementById("leaveBalance").textContent =
-    `Leave Left: ${data.remaining_days} days`;
+  try {
+    const res = await fetch(`/api/leaves/balance/${user.user_id}`);
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById("leaveBalance").textContent = `Leave Left: ${data.remaining_days} days`;
+    }
+  } catch (err) {
+    console.error("Balance Error:", err);
+  }
 }
 
 /* ================= LOGOUT ================= */
 function logout() {
   localStorage.clear();
-  sessionStorage.clear();
   window.location.href = "login.html";
 }
 </script>

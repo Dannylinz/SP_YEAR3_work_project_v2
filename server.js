@@ -1,3 +1,4 @@
+require('dotenv').config(); // This MUST be the first line
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
@@ -12,6 +13,7 @@ const chatboxRoutes = require("./src/routes/chatboxRoutes");
 const authRoutes = require("./src/routes/authRoutes");
 const profileRoutes = require("./src/routes/profileRoutes");
 const leaveRoutes = require("./src/routes/leaveRoutes");
+const notificationRoutes = require("./src/routes/notificationRoutes");
 
 const app = express();
 
@@ -42,8 +44,10 @@ app.use("/api/chatbox", chatboxRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/leaves", leaveRoutes);
+app.use("/api/notifications", notificationRoutes);
 // ----------------------------
 app.use("/pictures", express.static(path.join(__dirname, "pictures")));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Health check
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));

@@ -1,4 +1,5 @@
 const pool = require("../services/db");
+const authPool = require("../services/authDb"); // Required to bridge the two databases
 
 (async () => {
   try {
@@ -211,7 +212,7 @@ const pool = require("../services/db");
     console.log("✅ Table 'ChatboxQuestion' created");
 
     // ----------------------------
-    // ChatboxFlowStep Table (Yes/No branching)
+    // ChatboxFlowStep Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ChatboxFlowStep (
         step_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -227,39 +228,23 @@ const pool = require("../services/db");
     console.log("✅ Table 'ChatboxFlowStep' created");
 
     // ----------------------------
-    // ----------------------------
     // LEAVE MANAGEMENT TABLES
     // ----------------------------
-
-    // Leave Types Table
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS LeaveType (
-        leave_type_id INT AUTO_INCREMENT PRIMARY KEY,
-        type_name VARCHAR(50) UNIQUE,
-        description TEXT
-      );
-    `);
-    console.log("✅ Table 'LeaveType' created");
-
-    // Leave Records Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS LeaveRecord (
+      CREATE TABLE IF NOT EXISTS LeaveRequest (
         leave_id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
-        leave_type_id INT NOT NULL,
         leave_date DATE NOT NULL,
+        leave_type VARCHAR(100) NOT NULL,
         reason TEXT,
-        mc_file VARCHAR(255),
         status ENUM('pending','approved','rejected') DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         approved_by INT,
         approved_at TIMESTAMP NULL,
-        FOREIGN KEY (leave_type_id) REFERENCES LeaveType(leave_type_id)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log("✅ Table 'LeaveRecord' created");
+    console.log("✅ Table 'LeaveRequest' created");
 
-    // Leave Balance Table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS LeaveBalance (
         user_id INT PRIMARY KEY,
@@ -270,11 +255,69 @@ const pool = require("../services/db");
     `);
     console.log("✅ Table 'LeaveBalance' created");
 
-    console.log("🎉 All MAIN + Leave tables created successfully!");
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS LeaveAuditLog (
+        audit_id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        action VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✅ Table 'LeaveAuditLog' created");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS LeaveDocument (
+        doc_id INT AUTO_INCREMENT PRIMARY KEY,
+        leave_id INT NOT NULL,
+        file_path VARCHAR(255),
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✅ Table 'LeaveDocument' created");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS Notification (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        message TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        type VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("✅ Table 'Notification' created");
+
+    // ----------------------------
+    // 🚀 INITIALIZE LEAVE BALANCES (Fetching from Auth DB)
+    // ----------------------------
+    console.log("⏳ Initializing Leave Balances for existing users from Auth DB...");
+    
+    try {
+      // 1. Fetch user IDs from the 'User' table in meganet_auth
+      const [users] = await authPool.query("SELECT user_id FROM User");
+
+      if (users.length > 0) {
+        console.log(`🔹 Found ${users.length} users. Checking for missing balance records...`);
+        for (const user of users) {
+          // 2. Insert into the LeaveBalance table in meganet
+          await pool.query(`
+            INSERT IGNORE INTO LeaveBalance (user_id, total_days, used_days, remaining_days)
+            VALUES (?, 21, 0, 21)
+          `, [user.user_id]);
+        }
+        console.log(`✅ Balance initialization/sync complete.`);
+      } else {
+        console.log("ℹ️ No users found in Auth DB.");
+      }
+    } catch (err) {
+      console.warn("⚠️ Could not sync balances. Check if 'User' table exists in Auth DB:", err.message);
+    }
+
+    console.log("🎉 All MAIN + Leave tables and balances ready!");
     process.exit(0);
 
   } catch (err) {
-    console.error("❌ Error creating tables:", err);
+    console.error("❌ Error during database setup:", err);
     process.exit(1);
   }
 })();
