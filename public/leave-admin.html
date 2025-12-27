@@ -10,7 +10,12 @@
         .status-pending { color: #856404; background-color: #fff3cd; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
         .status-approved { color: #155724; background-color: #d4edda; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
         .status-rejected { color: #721c24; background-color: #f8d7da; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
-        .table img { max-height: 40px; border-radius: 4px; }
+        
+        /* Ensures the View/Download buttons look clean */
+        .btn-group-sm > .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
     </style>
 </head>
 <body>
@@ -30,7 +35,8 @@
                         <th>Type</th>
                         <th>Date</th>
                         <th>Reason</th>
-                        <th>Attachment</th> <th>Status</th>
+                        <th>Attachment</th> 
+                        <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -60,10 +66,21 @@
             data.forEach(leave => {
                 const isPending = leave.status === 'pending';
                 
-                // Logic to show "View MC" button if a file exists
-                const attachmentLink = leave.file_path 
-                    ? `<a href="${leave.file_path}" target="_blank" class="btn btn-outline-info btn-sm">📄 View MC</a>`
-                    : `<span class="text-muted small">No file</span>`;
+                // Logic for View and Download options
+                let attachmentHtml = `<span class="text-muted small">No file</span>`;
+                
+                if (leave.file_path) {
+                    attachmentHtml = `
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="${leave.file_path}" target="_blank" class="btn btn-outline-primary" title="View File">
+                                👁️ View
+                            </a>
+                            <a href="${leave.file_path}" download class="btn btn-primary" title="Download File">
+                                📥 Download
+                            </a>
+                        </div>
+                    `;
+                }
 
                 tbody.innerHTML += `
                     <tr>
@@ -71,7 +88,8 @@
                         <td><span class="badge bg-secondary">${leave.leave_type}</span></td>
                         <td>${new Date(leave.leave_date).toLocaleDateString()}</td>
                         <td><small>${leave.reason || '-'}</small></td>
-                        <td>${attachmentLink}</td> <td><span class="status-${leave.status}">${leave.status.toUpperCase()}</span></td>
+                        <td>${attachmentHtml}</td> 
+                        <td><span class="status-${leave.status}">${leave.status.toUpperCase()}</span></td>
                         <td>
                             ${isPending ? `
                                 <button class="btn btn-success btn-sm me-1" onclick="updateStatus(${leave.leave_id}, 'approved')">Approve</button>
@@ -95,8 +113,8 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     status: newStatus,
-                    user_id: user.user_id, // Admin ID for auditing
-                    role_id: user.role_id  // Admin Role for authorization
+                    user_id: user.user_id, 
+                    role_id: user.role_id  
                 })
             });
 
@@ -113,7 +131,6 @@
         }
     }
 
-    // Initial load
     fetchAllLeaves();
 </script>
 </body>

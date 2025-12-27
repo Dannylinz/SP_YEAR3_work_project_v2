@@ -57,32 +57,40 @@ exports.getLeaves = async (req, res) => {
  */
 exports.submitLeave = async (req, res) => {
   const { user_id, username, leave_date, leave_type, reason } = req.body;
-  console.log(`[Leave] Submission attempt by user: ${user_id} (${username}) for date: ${leave_date}`);
 
   if (!user_id || !leave_date || !leave_type) {
-    console.warn("⚠️ [Leave] Submission rejected: Missing required fields", req.body);
     return res.status(400).json({ message: "Missing fields" });
   }
 
   try {
-    console.log("[Leave] Inserting into LeaveRequest table...");
+    // 1. Insert into LeaveRequest
     const [result] = await pool.query(`
       INSERT INTO LeaveRequest (user_id, leave_date, leave_type, reason)
       VALUES (?, ?, ?, ?)
     `, [user_id, leave_date, leave_type, reason]);
     
-    console.log(`[Leave] Request inserted. ID: ${result.insertId}`);
+    const newLeaveId = result.insertId;
 
-    console.log("[Leave] Recording audit log...");
-    await pool.query(`
-      INSERT INTO LeaveAuditLog (user_id, action)
-      VALUES (?, 'Submitted leave request')
-    `, [user_id]);
+    // 2. If a file was uploaded, save it to LeaveDocument
+    if (req.file) {
+      // We save a web-friendly path
+      const filePath = `/uploads/mc/${req.file.filename}`;
+      
+      await pool.query(`
+        INSERT INTO LeaveDocument (leave_id, file_path)
+        VALUES (?, ?)
+      `, [newLeaveId, filePath]);
+      
+      console.log(`[Leave] Attachment linked to Leave ID: ${newLeaveId}`);
+    }
 
-    res.status(201).json({ message: "Leave submitted", leave_id: result.insertId });
+    // 3. Audit Log
+    await pool.query(`INSERT INTO LeaveAuditLog (user_id, action) VALUES (?, 'Submitted leave request')`, [user_id]);
+
+    res.status(201).json({ message: "Leave submitted successfully", leave_id: newLeaveId });
 
   } catch (err) {
-    console.error("❌ [Leave] Submit error:", { message: err.message, sql: err.sql });
+    console.error("❌ Submit error:", err);
     res.status(500).json({ message: "Database error" });
   }
 };
