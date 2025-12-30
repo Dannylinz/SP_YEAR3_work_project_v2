@@ -60,6 +60,9 @@
     }
     .notif-item:last-child { border-bottom: none; }
     .notif-unread { background-color: #f0f7ff; }
+    
+    /* Custom CSS to hide time specifically if the JS config is cached */
+    .fc-event-time { display: none !important; }
   </style>
 </head>
 
@@ -131,7 +134,6 @@
         <h5 class="modal-title">Apply Leave</h5>
         <button class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-
       <div class="modal-body">
         <div class="mb-2">
           <label class="form-label">Leave Type</label>
@@ -142,18 +144,15 @@
             <option>Reservist</option>
           </select>
         </div>
-
         <div class="mb-2">
           <label class="form-label">MC Document (optional)</label>
           <input type="file" id="mcFile" class="form-control">
         </div>
-
         <div class="mb-2">
           <label class="form-label">Reason</label>
           <textarea id="reason" class="form-control" rows="3"></textarea>
         </div>
       </div>
-
       <div class="modal-footer">
         <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button class="btn btn-primary" onclick="submitLeave()">Submit</button>
@@ -189,6 +188,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const calendarEl = document.getElementById("calendar");
   const calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: "dayGridMonth",
+    displayEventTime: false, // 🚀 FIX: Removes the "12a" from the view
     headerToolbar: {
       left: 'prev,next today',
       center: 'title',
@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   calendar.render();
   loadLeaveBalance();
-  loadNotifications(); // Load alerts on start
+  loadNotifications(); 
 });
 
 function onDateClick(date) {
@@ -216,7 +216,6 @@ async function loadNotifications() {
   try {
     const res = await fetch(`/api/notifications/${user.user_id}`);
     const data = await res.json();
-    
     const unread = data.filter(n => !n.is_read);
     const badge = document.getElementById("notifCount");
     
@@ -246,11 +245,9 @@ async function loadNotifications() {
   }
 }
 
-// Mark notifications as read when clicking the bell
 document.getElementById('notifBtn').addEventListener('click', async () => {
   try {
     await fetch(`/api/notifications/${user.user_id}/read`, { method: 'PUT' });
-    // Small delay to let user see unread state before badge vanishes
     setTimeout(() => {
       document.getElementById("notifCount").style.display = "none";
     }, 1000);
@@ -272,7 +269,7 @@ async function submitLeave() {
   
   const fileInput = document.getElementById("mcFile");
   if (fileInput.files[0]) {
-    fd.append("mc", fileInput.files[0]);
+    fd.append("mc_file", fileInput.files[0]);
   }
 
   try {
@@ -295,8 +292,9 @@ async function loadLeaves(info, success) {
     const data = await res.json();
 
     const events = data.map(l => ({
-      title: `${l.leave_type} (${l.status})`,
+      title: `${l.username} - ${l.leave_type}`,
       start: l.leave_date,
+      allDay: true, // 🚀 FIX: Ensures the calendar treats it as a full-day event
       color: l.status === "approved" ? "#28a745" : (l.status === "rejected" ? "#dc3545" : "#fd7e14")
     }));
     success(events);

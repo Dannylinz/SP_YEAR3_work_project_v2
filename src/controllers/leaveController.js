@@ -17,12 +17,13 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * 🟦 Get Leave Requests
+ * 🟦 Get Leave Requests (Modified to include Username from Auth DB)
  */
 exports.getLeaves = async (req, res) => {
   const { user_id, role_id } = req.query;
 
   try {
+    // 1. Fetch Leaves from the main database
     let sql = `
       SELECT l.*, d.file_path 
       FROM LeaveRequest l
@@ -31,8 +32,6 @@ exports.getLeaves = async (req, res) => {
     `;
     let params = [];
 
-    // Intern & Part-timer (Role 2, 3 etc) → own records only
-    // Admin (1) and Full-timer (4) can see more, but let's keep strict admin view
     if (!["1", "4"].includes(String(role_id))) {
       sql = `
         SELECT l.*, d.file_path 
@@ -44,8 +43,21 @@ exports.getLeaves = async (req, res) => {
       params = [user_id];
     }
 
-    const [rows] = await pool.query(sql, params);
-    res.json(rows);
+    const [leaves] = await pool.query(sql, params);
+
+    // 2. 🚀 BRIDGE: Fetch all usernames from the Auth Database
+    // This creates a lookup map: { "1": "User A", "2": "User B" }
+    const [users] = await authPool.query("SELECT user_id, username FROM User");
+    const userMap = {};
+    users.forEach(u => userMap[u.user_id] = u.username);
+
+    // 3. Attach the username to each leave record
+    const result = leaves.map(leave => ({
+      ...leave,
+      username: userMap[leave.user_id] || `User #${leave.user_id}` // Fallback if name not found
+    }));
+
+    res.json(result);
   } catch (err) {
     console.error("❌ Fetch error:", err);
     res.status(500).json({ message: "Database error" });
