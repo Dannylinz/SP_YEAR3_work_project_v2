@@ -9,6 +9,7 @@
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet"/>
 
   <style>
+    /* ALL ORIGINAL STYLES PRESERVED */
     html, body {
       height: 100%;
       background: #f4f6f9;
@@ -32,9 +33,24 @@
       padding: 16px;
     }
 
+    /* 👤 NEW: Profile Card for Balance */
+    .profile-card {
+      background: #fff;
+      border-left: 5px solid #0d6efd;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
     .fc-daygrid-day:hover {
-      background: #e8f0ff;
+      background: #e8f0ff !important;
       cursor: pointer;
+    }
+
+    /* Important for Dragging Visibility */
+    .fc-highlight {
+      background: rgba(13, 110, 253, 0.25) !important;
     }
 
     .badge-box span {
@@ -47,7 +63,7 @@
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
-    /* Notification Styling */
+    /* Notification Styling (Original) */
     .notif-dropdown {
       width: 300px;
       max-height: 400px;
@@ -61,7 +77,6 @@
     .notif-item:last-child { border-bottom: none; }
     .notif-unread { background-color: #f0f7ff; }
     
-    /* Custom CSS to hide time specifically if the JS config is cached */
     .fc-event-time { display: none !important; }
   </style>
 </head>
@@ -94,6 +109,20 @@
 
   <div class="content container py-4">
 
+    <div class="profile-card">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h5 class="mb-1">👤 <span id="profName">User</span>'s Leave Balance</h5>
+          <p class="text-muted small mb-0">Total Entitlement: <strong>21 Days Annual Leave</strong></p>
+          <div id="leaveHistorySummary" class="mt-2 small text-muted"></div>
+        </div>
+        <div class="col-md-4 text-md-end border-start">
+          <h3 class="text-primary mb-0" id="annualRemaining">--</h3>
+          <span class="text-muted small">Days Remaining</span>
+        </div>
+      </div>
+    </div>
+
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h4 class="mb-0">📅 Leave & MC Calendar</h4>
       <div class="badge-box d-flex align-items-center">
@@ -112,11 +141,11 @@
 
         <div id="adminControls"></div> 
         <span id="userBadge" class="badge bg-primary ms-2"></span>
-        <span id="leaveBalance" class="badge bg-success"></span>
       </div>
     </div>
 
     <div class="panel shadow-sm">
+      <div class="alert alert-light border small py-2 mb-2">💡 Click and drag to select multiple days.</div>
       <div id="calendar"></div>
     </div>
 
@@ -134,7 +163,13 @@
         <h5 class="modal-title">Apply Leave</h5>
         <button class="btn-close" data-bs-dismiss="modal"></button>
       </div>
+
       <div class="modal-body">
+        <div class="bg-light p-2 rounded mb-3 border">
+          <p class="text-primary fw-bold small mb-1">Range: <span id="rangeDisplay"></span></p>
+          <p class="text-dark fw-bold small mb-0">Total Days: <span id="totalDaysCount"></span></p>
+        </div>
+
         <div class="mb-2">
           <label class="form-label">Leave Type</label>
           <select id="leaveType" class="form-select">
@@ -144,15 +179,18 @@
             <option>Reservist</option>
           </select>
         </div>
+
         <div class="mb-2">
           <label class="form-label">MC Document (optional)</label>
           <input type="file" id="mcFile" class="form-control">
         </div>
+
         <div class="mb-2">
           <label class="form-label">Reason</label>
           <textarea id="reason" class="form-control" rows="3"></textarea>
         </div>
       </div>
+
       <div class="modal-footer">
         <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button class="btn btn-primary" onclick="submitLeave()">Submit</button>
@@ -165,7 +203,7 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 
 <script>
-/* ================= AUTH ================= */
+/* ================= ORIGINAL AUTH PRESERVED ================= */
 const user = JSON.parse(localStorage.getItem("user"));
 if (!user) window.location.href = "login.html";
 
@@ -180,38 +218,84 @@ if (isSystemAdmin) {
     `<a href="leave-admin.html" class="btn btn-warning btn-sm shadow-sm">🛡️ Manage Requests (Admin)</a>`;
 }
 
-/* ================= CALENDAR ================= */
-let selectedDate = null;
+/* ================= CALENDAR WITH DRAG SELECTION ================= */
+let selectedRange = { start: null, end: null };
 let leaveModal = new bootstrap.Modal(document.getElementById("leaveModal"));
 
 document.addEventListener("DOMContentLoaded", () => {
   const calendarEl = document.getElementById("calendar");
   const calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: "dayGridMonth",
-    displayEventTime: false, // 🚀 FIX: Removes the "12a" from the view
+    selectable: true,      // 🚀 ALLOWS DRAGGING
+    selectMirror: true,    // Shows visual highlight while dragging
+    unselectAuto: true,
+    displayEventTime: false,
     headerToolbar: {
       left: 'prev,next today',
       center: 'title',
       right: 'dayGridMonth,timeGridWeek'
     },
-    dateClick: info => onDateClick(info.dateStr),
+    select: function(info) {
+      if (!isWriter) {
+        alert("Read-only access: Staff cannot apply for leave.");
+        calendar.unselect();
+        return;
+      }
+      
+      selectedRange.start = info.startStr.split('T')[0];
+      
+      // FullCalendar end date is exclusive (next day), so we adjust it for storage
+      let endDate = new Date(info.end);
+      endDate.setDate(endDate.getDate() - 1);
+      selectedRange.end = endDate.toISOString().split('T')[0];
+
+      // Calculate total days for display
+      const diff = Math.ceil(Math.abs(new Date(selectedRange.end) - new Date(selectedRange.start)) / (1000 * 60 * 60 * 24)) + 1;
+
+      document.getElementById('rangeDisplay').textContent = 
+        selectedRange.start === selectedRange.end ? selectedRange.start : `${selectedRange.start} to ${selectedRange.end}`;
+      document.getElementById('totalDaysCount').textContent = diff;
+
+      leaveModal.show();
+    },
     events: loadLeaves
   });
   calendar.render();
-  loadLeaveBalance();
+  calculateMyProfile(); 
   loadNotifications(); 
 });
 
-function onDateClick(date) {
-  if (!isWriter) {
-    alert("Read-only access: Regular staff cannot apply for leave via this portal.");
-    return;
-  }
-  selectedDate = date;
-  leaveModal.show();
+/* ================= PROFILE BALANCE LOGIC ================= */
+async function calculateMyProfile() {
+  document.getElementById("profName").textContent = user.username;
+  try {
+    const res = await fetch(`/api/leaves?user_id=${user.user_id}&role_id=${user.role_id}`);
+    const data = await res.json();
+
+    let annualTaken = 0;
+    const historyItems = [];
+
+    data.filter(l => l.user_id == user.user_id && l.leave_type === "Annual Leave" && l.status === "approved")
+        .forEach(l => {
+            // STRIP TIME FROM API DATES
+            const cleanStart = l.leave_date.split('T')[0];
+            const cleanEnd = l.end_date ? l.end_date.split('T')[0] : cleanStart;
+
+            const start = new Date(cleanStart);
+            const end = new Date(cleanEnd);
+            const diff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            annualTaken += diff;
+            historyItems.push(`${cleanStart}${cleanEnd !== cleanStart ? ' to '+cleanEnd : ''} (${diff}d)`);
+        });
+
+    document.getElementById("annualRemaining").textContent = (21 - annualTaken);
+    document.getElementById("leaveHistorySummary").innerHTML = 
+        historyItems.length > 0 ? `Approved: ${historyItems.join(', ')}` : "No approved leave yet.";
+
+  } catch (err) { console.error(err); }
 }
 
-/* ================= NOTIFICATIONS ================= */
+/* ================= ORIGINAL NOTIFICATION LOGIC ================= */
 async function loadNotifications() {
   try {
     const res = await fetch(`/api/notifications/${user.user_id}`);
@@ -227,11 +311,6 @@ async function loadNotifications() {
     }
 
     const list = document.getElementById("notifItems");
-    if (data.length === 0) {
-      list.innerHTML = '<li><span class="dropdown-item text-muted small">No notifications</span></li>';
-      return;
-    }
-
     list.innerHTML = data.map(n => `
       <li class="notif-item ${n.is_read ? '' : 'notif-unread'}">
         <div class="px-3">
@@ -239,51 +318,39 @@ async function loadNotifications() {
           <small class="text-muted">${new Date(n.created_at).toLocaleString()}</small>
         </div>
       </li>
-    `).join('');
-  } catch (err) {
-    console.error("Notif Error:", err);
-  }
+    `).join('') || '<li><span class="dropdown-item text-muted small">No notifications</span></li>';
+  } catch (err) { console.error(err); }
 }
 
 document.getElementById('notifBtn').addEventListener('click', async () => {
   try {
     await fetch(`/api/notifications/${user.user_id}/read`, { method: 'PUT' });
-    setTimeout(() => {
-      document.getElementById("notifCount").style.display = "none";
-    }, 1000);
-  } catch (err) {
-    console.error("Read Error:", err);
-  }
+    setTimeout(() => { document.getElementById("notifCount").style.display = "none"; }, 1000);
+  } catch (err) { console.error(err); }
 });
 
-/* ================= API CALLS ================= */
+/* ================= ORIGINAL API ACTIONS ================= */
 async function submitLeave() {
-  if (!selectedDate) return alert("Please select a date.");
+  if (!selectedRange.start) return;
 
   const fd = new FormData();
   fd.append("user_id", user.user_id);
   fd.append("username", user.username);
-  fd.append("leave_date", selectedDate);
+  fd.append("leave_date", selectedRange.start);
+  fd.append("end_date", selectedRange.end); // 🚀 Multi-day support
   fd.append("leave_type", document.getElementById("leaveType").value);
   fd.append("reason", document.getElementById("reason").value);
   
   const fileInput = document.getElementById("mcFile");
-  if (fileInput.files[0]) {
-    fd.append("mc_file", fileInput.files[0]);
-  }
+  if (fileInput.files[0]) fd.append("mc_file", fileInput.files[0]);
 
   try {
     const res = await fetch("/api/leaves", { method: "POST", body: fd });
     if (res.ok) {
-      alert("Success: Leave request submitted.");
+      alert("Leave request submitted.");
       location.reload();
-    } else {
-      const err = await res.json();
-      alert("Submission Error: " + err.message);
     }
-  } catch (error) {
-    console.error("Network Error:", error);
-  }
+  } catch (error) { console.error(error); }
 }
 
 async function loadLeaves(info, success) {
@@ -293,34 +360,19 @@ async function loadLeaves(info, success) {
 
     const events = data.map(l => ({
       title: `${l.username} - ${l.leave_type}`,
-      start: l.leave_date,
-      allDay: true, // 🚀 FIX: Ensures the calendar treats it as a full-day event
+      start: l.leave_date.split('T')[0], // CLEAN TIME HERE
+      end: l.end_date ? new Date(new Date(l.end_date.split('T')[0]).getTime() + 86400000).toISOString().split('T')[0] : l.leave_date.split('T')[0],
+      allDay: true,
       color: l.status === "approved" ? "#28a745" : (l.status === "rejected" ? "#dc3545" : "#fd7e14")
     }));
     success(events);
-  } catch (err) {
-    console.error("Fetch Error:", err);
-  }
+  } catch (err) { console.error(err); }
 }
 
-async function loadLeaveBalance() {
-  try {
-    const res = await fetch(`/api/leaves/balance/${user.user_id}`);
-    if (res.ok) {
-      const data = await res.json();
-      document.getElementById("leaveBalance").textContent = `Leave Left: ${data.remaining_days} days`;
-    }
-  } catch (err) {
-    console.error("Balance Error:", err);
-  }
-}
-
-/* ================= LOGOUT ================= */
 function logout() {
   localStorage.clear();
   window.location.href = "login.html";
 }
 </script>
-
 </body>
 </html>

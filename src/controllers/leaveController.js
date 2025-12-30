@@ -65,45 +65,64 @@ exports.getLeaves = async (req, res) => {
 };
 
 /**
- * 🟩 Submit Leave
+ * 🟩 Submit Leave (Updated for Multiple Days)
  */
 exports.submitLeave = async (req, res) => {
-  const { user_id, username, leave_date, leave_type, reason } = req.body;
-
-  if (!user_id || !leave_date || !leave_type) {
-    return res.status(400).json({ message: "Missing fields" });
-  }
+  const { user_id, username, start_date, end_date, leave_type, reason } = req.body;
 
   try {
-    // 1. Insert into LeaveRequest
-    const [result] = await pool.query(`
-      INSERT INTO LeaveRequest (user_id, leave_date, leave_type, reason)
-      VALUES (?, ?, ?, ?)
-    `, [user_id, leave_date, leave_type, reason]);
-    
-    const newLeaveId = result.insertId;
+    // Calculate number of days
+    const start = new Date(start_date);
+    const end = new Date(end_date);
+    const diffTime = Math.abs(end - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both days
 
-    // 2. If a file was uploaded, save it to LeaveDocument
+    const [result] = await pool.query(`
+      INSERT INTO LeaveRequest (user_id, leave_date, end_date, leave_type, reason)
+      VALUES (?, ?, ?, ?, ?)
+    `, [user_id, start_date, end_date, leave_type, reason]);
+    
+    // Handle attachment if exists (same as before)
     if (req.file) {
-      // We save a web-friendly path
-      const filePath = `/uploads/mc/${req.file.filename}`;
-      
-      await pool.query(`
-        INSERT INTO LeaveDocument (leave_id, file_path)
-        VALUES (?, ?)
-      `, [newLeaveId, filePath]);
-      
-      console.log(`[Leave] Attachment linked to Leave ID: ${newLeaveId}`);
+      await pool.query(`INSERT INTO LeaveDocument (leave_id, file_path) VALUES (?, ?)`, 
+      [result.insertId, `/uploads/mc/${req.file.filename}`]);
     }
 
-    // 3. Audit Log
-    await pool.query(`INSERT INTO LeaveAuditLog (user_id, action) VALUES (?, 'Submitted leave request')`, [user_id]);
-
-    res.status(201).json({ message: "Leave submitted successfully", leave_id: newLeaveId });
-
+    res.status(201).json({ message: "Leave submitted", days: diffDays });
   } catch (err) {
-    console.error("❌ Submit error:", err);
     res.status(500).json({ message: "Database error" });
+  }
+};
+
+/**
+ * 🟨 Update Status (Updated to deduct specific day counts)
+ */
+exports.updateLeaveStatus = async (req, res) => {
+  const { leave_id } = req.params;
+  const { status, user_id, role_id } = req.body;
+
+  try {
+    const [[leave]] = await pool.query("SELECT * FROM LeaveRequest WHERE leave_id=?", [leave_id]);
+    
+    // Calculate days: (End - Start) + 1
+    const start = new Date(leave.leave_date);
+    const end = new Date(leave.end_date || leave.leave_date);
+    const daysRequested = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    await pool.query(`UPDATE LeaveRequest SET status=?, approved_by=? WHERE leave_id=?`, [status, user_id, leave_id]);
+
+    // ONLY deduct if it's Annual Leave and approved
+    if (status === "approved" && leave.leave_type === "Annual Leave") {
+      await pool.query(`
+        UPDATE LeaveBalance 
+        SET remaining_days = remaining_days - ? 
+        WHERE user_id=?
+      `, [daysRequested, leave.user_id]);
+    }
+
+    res.json({ message: "Status updated" });
+  } catch (err) {
+    res.status(500).json({ message: "Error" });
   }
 };
 

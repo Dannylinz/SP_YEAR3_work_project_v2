@@ -5,17 +5,12 @@
     <title>Admin - Leave Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background: #f8f9fa; font-family: sans-serif; }
+        body { background: #f8f9fa; font-family: sans-serif; padding-bottom: 50px; }
         .container { margin-top: 50px; }
         .status-pending { color: #856404; background-color: #fff3cd; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
         .status-approved { color: #155724; background-color: #d4edda; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
         .status-rejected { color: #721c24; background-color: #f8d7da; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
-        
-        /* Ensures the View/Download buttons look clean */
-        .btn-group-sm > .btn {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-        }
+        .btn-group-sm > .btn { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
     </style>
 </head>
 <body>
@@ -26,22 +21,39 @@
         <a href="leave.html" class="btn btn-outline-secondary">Back to Calendar</a>
     </div>
 
-    <div class="card shadow-sm">
+    <div class="card shadow-sm mb-5">
+        <div class="card-header bg-white"><strong>All Leave Requests</strong></div>
         <div class="card-body">
             <table class="table table-hover align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th>User ID</th>
+                        <th>User</th>
                         <th>Type</th>
-                        <th>Date</th>
+                        <th>Dates</th>
                         <th>Reason</th>
                         <th>Attachment</th> 
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody id="leaveTableBody">
-                    </tbody>
+                <tbody id="leaveTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-primary">
+        <div class="card-header bg-primary text-white"><strong>📊 Staff Annual Leave Balances (Full-Timer View)</strong></div>
+        <div class="card-body">
+            <table class="table table-bordered">
+                <thead>
+                    <tr class="table-light">
+                        <th>Staff Name</th>
+                        <th>Annual Taken</th>
+                        <th>Remaining (of 21)</th>
+                        <th>Status Bar</th>
+                    </tr>
+                </thead>
+                <tbody id="staffSummaryBody"></tbody>
             </table>
         </div>
     </div>
@@ -50,88 +62,104 @@
 <script>
     const user = JSON.parse(localStorage.getItem("user"));
 
-    // Check if user is logged in and is an Admin (Role 1)
     if (!user || String(user.role_id) !== "1") {
         alert("Unauthorized Access. Admin only.");
         window.location.href = "leave.html";
     }
 
-    async function fetchAllLeaves() {
+    async function fetchAllData() {
         try {
             const res = await fetch(`/api/leaves?user_id=${user.user_id}&role_id=${user.role_id}`);
             const data = await res.json();
-            const tbody = document.getElementById("leaveTableBody");
-            tbody.innerHTML = "";
+            
+            renderApprovalTable(data);
+            renderStaffSummary(data);
+        } catch (err) { console.error("Fetch Error:", err); }
+    }
 
-            data.forEach(leave => {
-                const isPending = leave.status === 'pending';
+    function renderApprovalTable(data) {
+        const tbody = document.getElementById("leaveTableBody");
+        tbody.innerHTML = "";
+
+        data.forEach(leave => {
+            const isPending = leave.status === 'pending';
+            
+            // CLEAN DATE LOGIC FOR ADMIN TABLE
+            const cleanStart = leave.leave_date.split('T')[0];
+            const cleanEnd = leave.end_date ? leave.end_date.split('T')[0] : cleanStart;
+
+            const dateDisplay = (cleanEnd && cleanEnd !== cleanStart) 
+                ? `${cleanStart} to ${cleanEnd}` 
+                : cleanStart;
+
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${leave.username || '#' + leave.user_id}</strong></td>
+                    <td><span class="badge bg-secondary">${leave.leave_type}</span></td>
+                    <td>${dateDisplay}</td>
+                    <td><small>${leave.reason || '-'}</small></td>
+                    <td>${leave.file_path ? `<a href="${leave.file_path}" target="_blank">View</a>` : 'No file'}</td> 
+                    <td><span class="status-${leave.status}">${leave.status.toUpperCase()}</span></td>
+                    <td>
+                        ${isPending ? `
+                            <button class="btn btn-success btn-sm" onclick="updateStatus(${leave.leave_id}, 'approved')">Approve</button>
+                            <button class="btn btn-danger btn-sm" onclick="updateStatus(${leave.leave_id}, 'rejected')">Reject</button>
+                        ` : `<small class="text-muted">Processed</small>`}
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    function renderStaffSummary(data) {
+        const summaryBody = document.getElementById("staffSummaryBody");
+        const stats = {};
+
+        data.forEach(l => {
+            if (!stats[l.username]) stats[l.username] = 0;
+            if (l.leave_type === "Annual Leave" && l.status === "approved") {
+                // CLEAN DATE LOGIC FOR SUMMARY CALCULATION
+                const cleanStart = l.leave_date.split('T')[0];
+                const cleanEnd = l.end_date ? l.end_date.split('T')[0] : cleanStart;
+
+                const start = new Date(cleanStart);
+                const end = new Date(cleanEnd);
                 
-                // Logic for View and Download options
-                let attachmentHtml = `<span class="text-muted small">No file</span>`;
-                
-                if (leave.file_path) {
-                    attachmentHtml = `
-                        <div class="btn-group btn-group-sm" role="group">
-                            <a href="${leave.file_path}" target="_blank" class="btn btn-outline-primary" title="View File">
-                                👁️ View
-                            </a>
-                            <a href="${leave.file_path}" download class="btn btn-primary" title="Download File">
-                                📥 Download
-                            </a>
+                const diff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                stats[l.username] += diff;
+            }
+        });
+
+        summaryBody.innerHTML = Object.keys(stats).map(name => {
+            const taken = stats[name];
+            const remaining = 21 - taken;
+            const progress = (taken / 21) * 100;
+            return `
+                <tr>
+                    <td><strong>${name}</strong></td>
+                    <td>${taken} Days</td>
+                    <td class="text-primary fw-bold">${remaining} Days</td>
+                    <td>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar" style="width: ${progress}%"></div>
                         </div>
-                    `;
-                }
-
-                tbody.innerHTML += `
-                    <tr>
-                        <td><strong>#${leave.user_id}</strong></td>
-                        <td><span class="badge bg-secondary">${leave.leave_type}</span></td>
-                        <td>${new Date(leave.leave_date).toLocaleDateString()}</td>
-                        <td><small>${leave.reason || '-'}</small></td>
-                        <td>${attachmentHtml}</td> 
-                        <td><span class="status-${leave.status}">${leave.status.toUpperCase()}</span></td>
-                        <td>
-                            ${isPending ? `
-                                <button class="btn btn-success btn-sm me-1" onclick="updateStatus(${leave.leave_id}, 'approved')">Approve</button>
-                                <button class="btn btn-danger btn-sm" onclick="updateStatus(${leave.leave_id}, 'rejected')">Reject</button>
-                            ` : `<small class="text-muted">Processed</small>`}
-                        </td>
-                    </tr>
-                `;
-            });
-        } catch (err) {
-            console.error("Fetch Error:", err);
-        }
+                    </td>
+                </tr>
+            `;
+        }).join('');
     }
 
     async function updateStatus(leaveId, newStatus) {
-        if (!confirm(`Are you sure you want to ${newStatus} this request?`)) return;
-
-        try {
-            const res = await fetch(`/api/leaves/${leaveId}/status`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    status: newStatus,
-                    user_id: user.user_id, 
-                    role_id: user.role_id  
-                })
-            });
-
-            if (res.ok) {
-                alert(`Leave ${newStatus} successfully! Notification sent.`);
-                fetchAllLeaves();
-            } else {
-                const errorData = await res.json();
-                alert("Update failed: " + errorData.message);
-            }
-        } catch (err) {
-            console.error("Update Error:", err);
-            alert("Error connecting to server.");
-        }
+        if (!confirm(`Are you sure?`)) return;
+        const res = await fetch(`/api/leaves/${leaveId}/status`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: newStatus, user_id: user.user_id, role_id: user.role_id })
+        });
+        if (res.ok) fetchAllData();
     }
 
-    fetchAllLeaves();
+    fetchAllData();
 </script>
 </body>
 </html>
