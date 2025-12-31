@@ -214,15 +214,27 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       
-      let startDate = new Date(info.startStr);
-      let endDate = new Date(info.endStr);
-      let visualEnd = new Date(endDate);
-      visualEnd.setDate(visualEnd.getDate() - 1);
+      // FIX 1: info.startStr and info.endStr are raw strings like '2025-12-23'
+      // We use them directly to avoid "new Date()" timezone math.
+      let startStr = info.startStr;
+      
+      // info.endStr is exclusive. For single day click on 23rd:
+      // startStr = '2025-12-23', endStr = '2025-12-24'
+      
+      // Calculate display end date (inclusive) manually from the string
+      let parts = info.endStr.split('-');
+      let dateObj = new Date(parts[0], parts[1]-1, parts[2]);
+      dateObj.setDate(dateObj.getDate() - 1);
+      
+      let visualEndStr = dateObj.getFullYear() + '-' + 
+                         String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
+                         String(dateObj.getDate()).padStart(2, '0');
 
-      selectedRange.start = info.startStr;
-      selectedRange.end = visualEnd.toISOString().split('T')[0];
+      selectedRange.start = startStr;
+      selectedRange.end = visualEndStr;
 
-      const diff = Math.round(Math.abs(visualEnd - startDate) / (1000 * 60 * 60 * 24)) + 1;
+      // Calculation for total days
+      const diff = Math.round((new Date(info.endStr) - new Date(info.startStr)) / (1000 * 60 * 60 * 24));
 
       document.getElementById('rangeDisplay').textContent = 
         selectedRange.start === selectedRange.end ? selectedRange.start : `${selectedRange.start} to ${selectedRange.end}`;
@@ -248,7 +260,13 @@ async function calculateMyProfile() {
         .forEach(l => {
             const cleanStart = l.leave_date.split('T')[0];
             const cleanEnd = l.end_date ? l.end_date.split('T')[0] : cleanStart;
-            const diff = Math.round((new Date(cleanEnd) - new Date(cleanStart)) / (1000 * 60 * 60 * 24)) + 1;
+            
+            const s = cleanStart.split('-').map(Number);
+            const e = cleanEnd.split('-').map(Number);
+            const d1 = Date.UTC(s[0], s[1]-1, s[2]);
+            const d2 = Date.UTC(e[0], e[1]-1, e[2]);
+            const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+            
             annualTaken += diff;
             historyItems.push(`${cleanStart}${cleanEnd !== cleanStart ? ' to '+cleanEnd : ''} (${diff}d)`);
         });
@@ -289,18 +307,24 @@ document.getElementById('notifBtn').addEventListener('click', async () => {
   } catch (err) { console.error(err); }
 });
 
+// --- FIX: Updated submitLeave to send clean strings ---
 async function submitLeave() {
   if (!selectedRange.start) return;
+  
   const fd = new FormData();
   fd.append("user_id", user.user_id);
   fd.append("username", user.username);
-  // Matches backend parameter names
-  fd.append("leave_date", selectedRange.start);
+  
+  // We send the pure strings "2025-12-23" to the server
+  fd.append("leave_date", selectedRange.start); 
   fd.append("end_date", selectedRange.end); 
+  
   fd.append("leave_type", document.getElementById("leaveType").value);
   fd.append("reason", document.getElementById("reason").value);
+  
   const fileInput = document.getElementById("mcFile");
   if (fileInput.files[0]) fd.append("mc_file", fileInput.files[0]);
+
   try {
     const res = await fetch("/api/leaves", { method: "POST", body: fd });
     if (res.ok) {
@@ -310,19 +334,30 @@ async function submitLeave() {
   } catch (error) { console.error(error); }
 }
 
+// --- FIX: Updated loadLeaves to prevent the "Day-Back" shift ---
 async function loadLeaves(info, success) {
   try {
     const res = await fetch(`/api/leaves?user_id=${user.user_id}&role_id=${user.role_id}`);
     const data = await res.json();
+    
     const events = data.map(l => {
-        const start = l.leave_date.split('T')[0];
-        const end = l.end_date ? l.end_date.split('T')[0] : start;
-        let calEnd = new Date(end);
-        calEnd.setDate(calEnd.getDate() + 1);
+        // Strip any time suffix from the DB response
+        const startStr = l.leave_date.split('T')[0];
+        const endStr = l.end_date ? l.end_date.split('T')[0] : startStr;
+        
+        // FullCalendar needs end date to be +1 day of the last leave day to display correctly
+        let parts = endStr.split('-').map(Number);
+        let endDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+        endDateObj.setDate(endDateObj.getDate() + 1);
+        
+        const finalEndStr = endDateObj.getFullYear() + '-' + 
+                           String(endDateObj.getMonth() + 1).padStart(2, '0') + '-' + 
+                           String(endDateObj.getDate()).padStart(2, '0');
+        
         return {
           title: `${l.username} - ${l.leave_type}`,
-          start: start,
-          end: calEnd.toISOString().split('T')[0],
+          start: startStr,
+          end: finalEndStr,
           allDay: true,
           color: l.status === "approved" ? "#28a745" : (l.status === "rejected" ? "#dc3545" : "#fd7e14")
         };
