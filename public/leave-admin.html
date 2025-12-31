@@ -84,7 +84,6 @@
         data.forEach(leave => {
             const isPending = leave.status === 'pending';
             
-            // CLEAN DATE LOGIC FOR ADMIN TABLE
             const cleanStart = leave.leave_date.split('T')[0];
             const cleanEnd = leave.end_date ? leave.end_date.split('T')[0] : cleanStart;
 
@@ -118,14 +117,11 @@
         data.forEach(l => {
             if (!stats[l.username]) stats[l.username] = 0;
             if (l.leave_type === "Annual Leave" && l.status === "approved") {
-                // CLEAN DATE LOGIC FOR SUMMARY CALCULATION
                 const cleanStart = l.leave_date.split('T')[0];
                 const cleanEnd = l.end_date ? l.end_date.split('T')[0] : cleanStart;
-
                 const start = new Date(cleanStart);
                 const end = new Date(cleanEnd);
-                
-                const diff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                const diff = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
                 stats[l.username] += diff;
             }
         });
@@ -133,7 +129,7 @@
         summaryBody.innerHTML = Object.keys(stats).map(name => {
             const taken = stats[name];
             const remaining = 21 - taken;
-            const progress = (taken / 21) * 100;
+            const progress = Math.min((taken / 21) * 100, 100);
             return `
                 <tr>
                     <td><strong>${name}</strong></td>

@@ -68,11 +68,12 @@ exports.getLeaves = async (req, res) => {
  * 🟩 Submit Leave (Updated for Multiple Days)
  */
 exports.submitLeave = async (req, res) => {
-  const { user_id, username, start_date, end_date, leave_type, reason } = req.body;
+  // FIXED: Destructure leave_date to match what the frontend sends
+  const { user_id, username, leave_date, end_date, leave_type, reason } = req.body;
 
   try {
     // Calculate number of days
-    const start = new Date(start_date);
+    const start = new Date(leave_date);
     const end = new Date(end_date);
     const diffTime = Math.abs(end - start);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both days
@@ -80,7 +81,7 @@ exports.submitLeave = async (req, res) => {
     const [result] = await pool.query(`
       INSERT INTO LeaveRequest (user_id, leave_date, end_date, leave_type, reason)
       VALUES (?, ?, ?, ?, ?)
-    `, [user_id, start_date, end_date, leave_type, reason]);
+    `, [user_id, leave_date, end_date, leave_type, reason]);
     
     // Handle attachment if exists (same as before)
     if (req.file) {
@@ -90,44 +91,13 @@ exports.submitLeave = async (req, res) => {
 
     res.status(201).json({ message: "Leave submitted", days: diffDays });
   } catch (err) {
+    console.error("❌ Submit error:", err);
     res.status(500).json({ message: "Database error" });
   }
 };
 
 /**
- * 🟨 Update Status (Updated to deduct specific day counts)
- */
-exports.updateLeaveStatus = async (req, res) => {
-  const { leave_id } = req.params;
-  const { status, user_id, role_id } = req.body;
-
-  try {
-    const [[leave]] = await pool.query("SELECT * FROM LeaveRequest WHERE leave_id=?", [leave_id]);
-    
-    // Calculate days: (End - Start) + 1
-    const start = new Date(leave.leave_date);
-    const end = new Date(leave.end_date || leave.leave_date);
-    const daysRequested = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-
-    await pool.query(`UPDATE LeaveRequest SET status=?, approved_by=? WHERE leave_id=?`, [status, user_id, leave_id]);
-
-    // ONLY deduct if it's Annual Leave and approved
-    if (status === "approved" && leave.leave_type === "Annual Leave") {
-      await pool.query(`
-        UPDATE LeaveBalance 
-        SET remaining_days = remaining_days - ? 
-        WHERE user_id=?
-      `, [daysRequested, leave.user_id]);
-    }
-
-    res.json({ message: "Status updated" });
-  } catch (err) {
-    res.status(500).json({ message: "Error" });
-  }
-};
-
-/**
- * 🟨 Approve / Reject Leave with Notifications
+ * 🟨 Update Status (Unified version - Fixes deduction and handles notifications)
  */
 exports.updateLeaveStatus = async (req, res) => {
   const { leave_id } = req.params;
@@ -165,13 +135,17 @@ exports.updateLeaveStatus = async (req, res) => {
       WHERE leave_id=?
     `, [status, user_id, leave_id]);
 
-    // 4. Deduct leave balance if approved
+    // 4. Deduct leave balance if approved (FIXED: Uses actual day count)
     if (status === "approved" && leave.leave_type === "Annual Leave") {
-      await pool.query(`
-        UPDATE LeaveBalance
-        SET remaining_days = remaining_days - 1
-        WHERE user_id=?
-      `, [leave.user_id]);
+        const start = new Date(leave.leave_date);
+        const end = new Date(leave.end_date || leave.leave_date);
+        const daysRequested = Math.round(Math.abs(end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+        await pool.query(`
+            UPDATE LeaveBalance
+            SET remaining_days = remaining_days - ?
+            WHERE user_id=?
+        `, [daysRequested, leave.user_id]);
     }
 
     // 5. Save In-App Notification
