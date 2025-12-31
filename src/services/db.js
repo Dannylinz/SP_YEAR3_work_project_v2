@@ -8,8 +8,10 @@ const pool = mysql.createPool({
   password: "",         // add your DB password if any
   database: "meganet",  // your database name
   waitForConnections: true,
+  dateStrings: true,
   connectionLimit: 10,
   queueLimit: 0,
+  timezone: '+00:00'
 });
 
 // ✅ Export for async/await usage

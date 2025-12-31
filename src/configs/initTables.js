@@ -235,6 +235,7 @@ const authPool = require("../services/authDb"); // Required to bridge the two da
         leave_id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
         leave_date DATE NOT NULL,
+        end_date DATE NOT NULL,
         leave_type VARCHAR(100) NOT NULL,
         reason TEXT,
         status ENUM('pending','approved','rejected') DEFAULT 'pending',
