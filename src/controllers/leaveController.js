@@ -60,28 +60,30 @@ exports.getLeaves = async (req, res) => {
 };
 
 /**
- * 🟩 Submit Leave (Fixed for strict date parsing)
+ * 🟩 Submit Leave (Updated to accept and store days_count)
  */
 exports.submitLeave = async (req, res) => {
-  const { user_id, username, leave_date, end_date, leave_type, reason } = req.body;
+  // Added days_count to destructuring
+  const { user_id, username, leave_date, end_date, leave_type, reason, days_count } = req.body;
 
   try {
-    // We calculate days based on the string values to avoid UTC shifting
+    // We calculate a fallback diff only if days_count wasn't provided by frontend
     const start = new Date(leave_date);
     const end = new Date(end_date);
-    const diffDays = Math.round(Math.abs(end - start) / (1000 * 60 * 60 * 24)) + 1;
+    const fallbackDiff = Math.round(Math.abs(end - start) / (1000 * 60 * 60 * 24)) + 1;
+    const finalDaysCount = days_count !== undefined ? days_count : fallbackDiff;
 
     const [result] = await pool.query(`
-      INSERT INTO LeaveRequest (user_id, leave_date, end_date, leave_type, reason)
-      VALUES (?, ?, ?, ?, ?)
-    `, [user_id, leave_date, end_date, leave_type, reason]);
+      INSERT INTO LeaveRequest (user_id, leave_date, end_date, leave_type, reason, days_count)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [user_id, leave_date, end_date, leave_type, reason, finalDaysCount]);
     
     if (req.file) {
       await pool.query(`INSERT INTO LeaveDocument (leave_id, file_path) VALUES (?, ?)`, 
       [result.insertId, `/uploads/mc/${req.file.filename}`]);
     }
 
-    res.status(201).json({ message: "Leave submitted", days: diffDays });
+    res.status(201).json({ message: "Leave submitted", days: finalDaysCount });
   } catch (err) {
     console.error("❌ Submit error:", err);
     res.status(500).json({ message: "Database error" });
@@ -89,7 +91,7 @@ exports.submitLeave = async (req, res) => {
 };
 
 /**
- * 🟨 Update Status
+ * 🟨 Update Status (Updated to deduct specific days_count)
  */
 exports.updateLeaveStatus = async (req, res) => {
   const { leave_id } = req.params;
@@ -121,15 +123,16 @@ exports.updateLeaveStatus = async (req, res) => {
     `, [status, user_id, leave_id]);
 
     if (status === "approved" && leave.leave_type === "Annual Leave") {
-        const start = new Date(leave.leave_date);
-        const end = new Date(leave.end_date || leave.leave_date);
-        const daysRequested = Math.round(Math.abs(end - start) / (1000 * 60 * 60 * 24)) + 1;
+        // FIX: Instead of recalculating from dates (which ignores 0.5), 
+        // we use the days_count column from the database.
+        const daysToDeduct = parseFloat(leave.days_count || 1.0);
 
         await pool.query(`
             UPDATE LeaveBalance
-            SET remaining_days = remaining_days - ?
+            SET remaining_days = remaining_days - ?,
+                used_days = used_days + ?
             WHERE user_id=?
-        `, [daysRequested, leave.user_id]);
+        `, [daysToDeduct, daysToDeduct, leave.user_id]);
     }
 
     const notifMessage = `Your ${leave.leave_type} request for ${new Date(leave.leave_date).toLocaleDateString()} has been ${status}.`;
@@ -151,6 +154,7 @@ exports.updateLeaveStatus = async (req, res) => {
             <table style="width: 100%; background: #f9f9f9; padding: 10px; border-radius: 5px;">
               <tr><td><strong>Date:</strong></td><td>${new Date(leave.leave_date).toLocaleDateString()}</td></tr>
               <tr><td><strong>Type:</strong></td><td>${leave.leave_type}</td></tr>
+              <tr><td><strong>Days:</strong></td><td>${leave.days_count}</td></tr>
               <tr><td><strong>Status:</strong></td><td><span style="font-weight: bold; color: ${status === 'approved' ? '#28a745' : '#dc3545'};">${status.toUpperCase()}</span></td></tr>
             </table>
             <p>Please log in to your dashboard to view updated balances.</p>

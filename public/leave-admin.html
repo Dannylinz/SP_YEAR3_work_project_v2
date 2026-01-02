@@ -31,7 +31,7 @@
                             <th>User</th>
                             <th>Type</th>
                             <th>Dates</th>
-                            <th>Reason</th>
+                            <th>Days</th> <th>Reason</th>
                             <th>Attachment</th> 
                             <th>Status</th>
                             <th>Actions</th>
@@ -91,20 +91,22 @@
         data.forEach(leave => {
             const isPending = leave.status === 'pending';
             
-            // Extract the date strings directly to prevent timezone roll-backs
             const cleanStart = leave.leave_date.split('T')[0];
             const cleanEnd = leave.end_date ? leave.end_date.split('T')[0] : cleanStart;
 
-            // Simple display logic: if start and end are same, show one date.
             const dateDisplay = (cleanEnd === cleanStart) 
                 ? cleanStart 
                 : `${cleanStart} to ${cleanEnd}`;
+            
+            // Logic: Use the days_count from DB for display
+            const daysDisplay = parseFloat(leave.days_count || 1).toFixed(1);
 
             tbody.innerHTML += `
                 <tr>
                     <td><strong>${leave.username || '#' + leave.user_id}</strong></td>
                     <td><span class="badge bg-secondary">${leave.leave_type}</span></td>
                     <td>${dateDisplay}</td>
+                    <td><span class="fw-bold text-dark">${daysDisplay}</span></td>
                     <td><small>${leave.reason || '-'}</small></td>
                     <td>${leave.file_path ? `<a href="${leave.file_path}" target="_blank">View</a>` : 'No file'}</td> 
                     <td><span class="status-${leave.status}">${leave.status.toUpperCase()}</span></td>
@@ -128,32 +130,32 @@
         data.forEach(l => {
             if (!stats[l.username]) stats[l.username] = 0;
             
-            // Only count approved Annual Leave toward the "Taken" balance
+            // FIX: Use the 'days_count' field from the database instead of calculating from dates
             if (l.leave_type === "Annual Leave" && l.status === "approved") {
-                const cleanStart = l.leave_date.split('T')[0];
-                const cleanEnd = l.end_date ? l.end_date.split('T')[0] : cleanStart;
+                const count = l.days_count != null ? parseFloat(l.days_count) : 0;
                 
-                // Use UTC parts to calculate difference to avoid local timezone noise
-                const startParts = cleanStart.split('-').map(Number);
-                const endParts = cleanEnd.split('-').map(Number);
-                
-                const startDate = Date.UTC(startParts[0], startParts[1] - 1, startParts[2]);
-                const endDate = Date.UTC(endParts[0], endParts[1] - 1, endParts[2]);
-                
-                const diff = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
-                stats[l.username] += diff;
+                // Fallback for older entries that might not have days_count
+                if (count === 0) {
+                    const s = l.leave_date.split('T')[0].split('-').map(Number);
+                    const e = (l.end_date || l.leave_date).split('T')[0].split('-').map(Number);
+                    const d1 = Date.UTC(s[0], s[1]-1, s[2]);
+                    const d2 = Date.UTC(e[0], e[1]-1, e[2]);
+                    stats[l.username] += (Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1);
+                } else {
+                    stats[l.username] += count;
+                }
             }
         });
 
         summaryBody.innerHTML = Object.keys(stats).map(name => {
             const taken = stats[name];
-            const remaining = 21 - taken;
+            const remaining = (21 - taken).toFixed(1); // Use toFixed for decimals
             const progress = Math.min((taken / 21) * 100, 100);
             
             return `
                 <tr>
                     <td><strong>${name}</strong></td>
-                    <td>${taken} Days</td>
+                    <td>${taken.toFixed(1)} Days</td>
                     <td class="text-primary fw-bold">${remaining} Days</td>
                     <td>
                         <div class="progress" style="height: 12px;">
@@ -183,7 +185,6 @@
             });
             
             if (res.ok) {
-                // Refresh data to show updated status and balances immediately
                 fetchAllData();
             } else {
                 const errData = await res.json();
@@ -195,7 +196,6 @@
         }
     }
 
-    // Initial Load
     fetchAllData();
 </script>
 </body>

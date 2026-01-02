@@ -125,7 +125,7 @@
     </div>
 
     <div class="panel shadow-sm">
-      <div class="alert alert-light border small py-2 mb-2">💡 Click and drag to select multiple days.</div>
+      <div class="alert alert-light border small py-2 mb-2">💡 Click and drag to select multiple days. For Half-Day, select a single day.</div>
       <div id="calendar"></div>
     </div>
   </div>
@@ -147,6 +147,7 @@
           <p class="text-primary fw-bold small mb-1">Range: <span id="rangeDisplay"></span></p>
           <p class="text-dark fw-bold small mb-0">Total Days: <span id="totalDaysCount"></span></p>
         </div>
+        
         <div class="mb-2">
           <label class="form-label">Leave Type</label>
           <select id="leaveType" class="form-select">
@@ -156,6 +157,23 @@
             <option>Reservist</option>
           </select>
         </div>
+
+        <div class="mb-2" id="durationContainer">
+          <label class="form-label">Duration</label>
+          <select id="leaveDuration" class="form-select" onchange="toggleHalfDayOptions()">
+            <option value="full">Full Day</option>
+            <option value="half">Half Day (0.5)</option>
+          </select>
+        </div>
+
+        <div id="halfDayOptions" class="mb-2" style="display: none;">
+          <label class="form-label">Period</label>
+          <select id="halfDayPeriod" class="form-select">
+            <option value="AM">Morning (AM)</option>
+            <option value="PM">Afternoon (PM)</option>
+          </select>
+        </div>
+
         <div class="mb-2">
           <label class="form-label">MC Document (optional)</label>
           <input type="file" id="mcFile" class="form-control">
@@ -191,7 +209,7 @@ if (isSystemAdmin) {
     `<a href="leave-admin.html" class="btn btn-warning btn-sm shadow-sm">🛡️ Manage Requests (Admin)</a>`;
 }
 
-let selectedRange = { start: null, end: null };
+let selectedRange = { start: null, end: null, originalDiff: 1 };
 let leaveModal = new bootstrap.Modal(document.getElementById("leaveModal"));
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -214,31 +232,36 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       
-      // FIX 1: info.startStr and info.endStr are raw strings like '2025-12-23'
-      // We use them directly to avoid "new Date()" timezone math.
-      let startStr = info.startStr;
+      // Store raw strings
+      selectedRange.start = info.startStr;
       
-      // info.endStr is exclusive. For single day click on 23rd:
-      // startStr = '2025-12-23', endStr = '2025-12-24'
-      
-      // Calculate display end date (inclusive) manually from the string
       let parts = info.endStr.split('-');
       let dateObj = new Date(parts[0], parts[1]-1, parts[2]);
       dateObj.setDate(dateObj.getDate() - 1);
       
-      let visualEndStr = dateObj.getFullYear() + '-' + 
+      selectedRange.end = dateObj.getFullYear() + '-' + 
                          String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
                          String(dateObj.getDate()).padStart(2, '0');
 
-      selectedRange.start = startStr;
-      selectedRange.end = visualEndStr;
+      // Calculate the range difference
+      selectedRange.originalDiff = Math.round((new Date(info.endStr) - new Date(info.startStr)) / (1000 * 60 * 60 * 24));
 
-      // Calculation for total days
-      const diff = Math.round((new Date(info.endStr) - new Date(info.startStr)) / (1000 * 60 * 60 * 24));
+      // Reset Modal UI
+      const durationContainer = document.getElementById('durationContainer');
+      const leaveDurationSelect = document.getElementById('leaveDuration');
+      
+      // Show Half-Day option ONLY if exactly 1 day is selected
+      if (selectedRange.originalDiff === 1) {
+        durationContainer.style.display = 'block';
+      } else {
+        durationContainer.style.display = 'none';
+        leaveDurationSelect.value = 'full';
+      }
+      
+      toggleHalfDayOptions(); // Initialize view based on defaults
 
       document.getElementById('rangeDisplay').textContent = 
         selectedRange.start === selectedRange.end ? selectedRange.start : `${selectedRange.start} to ${selectedRange.end}`;
-      document.getElementById('totalDaysCount').textContent = diff;
 
       leaveModal.show();
     },
@@ -249,6 +272,20 @@ document.addEventListener("DOMContentLoaded", () => {
   loadNotifications(); 
 });
 
+function toggleHalfDayOptions() {
+  const durationType = document.getElementById("leaveDuration").value;
+  const halfDayOptions = document.getElementById("halfDayOptions");
+  const countDisplay = document.getElementById('totalDaysCount');
+  
+  if (durationType === "half") {
+    halfDayOptions.style.display = "block";
+    countDisplay.textContent = "0.5";
+  } else {
+    halfDayOptions.style.display = "none";
+    countDisplay.textContent = selectedRange.originalDiff;
+  }
+}
+
 async function calculateMyProfile() {
   document.getElementById("profName").textContent = user.username;
   try {
@@ -256,21 +293,26 @@ async function calculateMyProfile() {
     const data = await res.json();
     let annualTaken = 0;
     const historyItems = [];
+    
     data.filter(l => l.user_id == user.user_id && l.leave_type === "Annual Leave" && l.status === "approved")
         .forEach(l => {
-            const cleanStart = l.leave_date.split('T')[0];
-            const cleanEnd = l.end_date ? l.end_date.split('T')[0] : cleanStart;
-            
-            const s = cleanStart.split('-').map(Number);
-            const e = cleanEnd.split('-').map(Number);
-            const d1 = Date.UTC(s[0], s[1]-1, s[2]);
-            const d2 = Date.UTC(e[0], e[1]-1, e[2]);
-            const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+            // Priority 1: Use days_count from DB if it exists
+            // Priority 2: Calculate manually if days_count is null
+            let diff;
+            if (l.days_count != null) {
+              diff = parseFloat(l.days_count);
+            } else {
+              const s = l.leave_date.split('T')[0].split('-').map(Number);
+              const e = (l.end_date || l.leave_date).split('T')[0].split('-').map(Number);
+              const d1 = Date.UTC(s[0], s[1]-1, s[2]);
+              const d2 = Date.UTC(e[0], e[1]-1, e[2]);
+              diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+            }
             
             annualTaken += diff;
-            historyItems.push(`${cleanStart}${cleanEnd !== cleanStart ? ' to '+cleanEnd : ''} (${diff}d)`);
+            historyItems.push(`${l.leave_date.split('T')[0]} (${diff}d)`);
         });
-    document.getElementById("annualRemaining").textContent = (21 - annualTaken);
+    document.getElementById("annualRemaining").textContent = (21 - annualTaken).toFixed(1);
     document.getElementById("leaveHistorySummary").innerHTML = 
         historyItems.length > 0 ? `Approved: ${historyItems.join(', ')}` : "No approved leave yet.";
   } catch (err) { console.error(err); }
@@ -307,20 +349,27 @@ document.getElementById('notifBtn').addEventListener('click', async () => {
   } catch (err) { console.error(err); }
 });
 
-// --- FIX: Updated submitLeave to send clean strings ---
 async function submitLeave() {
   if (!selectedRange.start) return;
+  
+  const durationType = document.getElementById("leaveDuration").value;
+  const isHalf = durationType === "half";
+  const period = isHalf ? document.getElementById("halfDayPeriod").value : "Full";
   
   const fd = new FormData();
   fd.append("user_id", user.user_id);
   fd.append("username", user.username);
-  
-  // We send the pure strings "2025-12-23" to the server
   fd.append("leave_date", selectedRange.start); 
   fd.append("end_date", selectedRange.end); 
-  
   fd.append("leave_type", document.getElementById("leaveType").value);
-  fd.append("reason", document.getElementById("reason").value);
+  
+  // Logic: Send a dedicated days_count field for the DB to handle balance correctly
+  const finalCount = isHalf ? 0.5 : selectedRange.originalDiff;
+  fd.append("days_count", finalCount);
+  
+  // Note: Appending period info to reason so it shows in the admin panel table even if not updated
+  const reasonText = document.getElementById("reason").value;
+  fd.append("reason", isHalf ? `[${period} Half Day] ${reasonText}` : reasonText);
   
   const fileInput = document.getElementById("mcFile");
   if (fileInput.files[0]) fd.append("mc_file", fileInput.files[0]);
@@ -334,18 +383,15 @@ async function submitLeave() {
   } catch (error) { console.error(error); }
 }
 
-// --- FIX: Updated loadLeaves to prevent the "Day-Back" shift ---
 async function loadLeaves(info, success) {
   try {
     const res = await fetch(`/api/leaves?user_id=${user.user_id}&role_id=${user.role_id}`);
     const data = await res.json();
     
     const events = data.map(l => {
-        // Strip any time suffix from the DB response
         const startStr = l.leave_date.split('T')[0];
         const endStr = l.end_date ? l.end_date.split('T')[0] : startStr;
         
-        // FullCalendar needs end date to be +1 day of the last leave day to display correctly
         let parts = endStr.split('-').map(Number);
         let endDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
         endDateObj.setDate(endDateObj.getDate() + 1);
@@ -354,12 +400,14 @@ async function loadLeaves(info, success) {
                            String(endDateObj.getMonth() + 1).padStart(2, '0') + '-' + 
                            String(endDateObj.getDate()).padStart(2, '0');
         
+        const isHalf = parseFloat(l.days_count) === 0.5;
+
         return {
-          title: `${l.username} - ${l.leave_type}`,
+          title: `${l.username} - ${l.leave_type}${isHalf ? ' (0.5d)' : ''}`,
           start: startStr,
           end: finalEndStr,
           allDay: true,
-          color: l.status === "approved" ? "#28a745" : (l.status === "rejected" ? "#dc3545" : "#fd7e14")
+          color: isHalf ? "#17a2b8" : (l.status === "approved" ? "#28a745" : (l.status === "rejected" ? "#dc3545" : "#fd7e14"))
         };
     });
     success(events);
