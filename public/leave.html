@@ -232,7 +232,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       
-      // Store raw strings
       selectedRange.start = info.startStr;
       
       let parts = info.endStr.split('-');
@@ -240,17 +239,14 @@ document.addEventListener("DOMContentLoaded", () => {
       dateObj.setDate(dateObj.getDate() - 1);
       
       selectedRange.end = dateObj.getFullYear() + '-' + 
-                         String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
-                         String(dateObj.getDate()).padStart(2, '0');
+                           String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
+                           String(dateObj.getDate()).padStart(2, '0');
 
-      // Calculate the range difference
       selectedRange.originalDiff = Math.round((new Date(info.endStr) - new Date(info.startStr)) / (1000 * 60 * 60 * 24));
 
-      // Reset Modal UI
       const durationContainer = document.getElementById('durationContainer');
       const leaveDurationSelect = document.getElementById('leaveDuration');
       
-      // Show Half-Day option ONLY if exactly 1 day is selected
       if (selectedRange.originalDiff === 1) {
         durationContainer.style.display = 'block';
       } else {
@@ -258,7 +254,7 @@ document.addEventListener("DOMContentLoaded", () => {
         leaveDurationSelect.value = 'full';
       }
       
-      toggleHalfDayOptions(); // Initialize view based on defaults
+      toggleHalfDayOptions(); 
 
       document.getElementById('rangeDisplay').textContent = 
         selectedRange.start === selectedRange.end ? selectedRange.start : `${selectedRange.start} to ${selectedRange.end}`;
@@ -296,8 +292,6 @@ async function calculateMyProfile() {
     
     data.filter(l => l.user_id == user.user_id && l.leave_type === "Annual Leave" && l.status === "approved")
         .forEach(l => {
-            // Priority 1: Use days_count from DB if it exists
-            // Priority 2: Calculate manually if days_count is null
             let diff;
             if (l.days_count != null) {
               diff = parseFloat(l.days_count);
@@ -363,24 +357,35 @@ async function submitLeave() {
   fd.append("end_date", selectedRange.end); 
   fd.append("leave_type", document.getElementById("leaveType").value);
   
-  // Logic: Send a dedicated days_count field for the DB to handle balance correctly
   const finalCount = isHalf ? 0.5 : selectedRange.originalDiff;
   fd.append("days_count", finalCount);
   
-  // Note: Appending period info to reason so it shows in the admin panel table even if not updated
   const reasonText = document.getElementById("reason").value;
   fd.append("reason", isHalf ? `[${period} Half Day] ${reasonText}` : reasonText);
   
   const fileInput = document.getElementById("mcFile");
-  if (fileInput.files[0]) fd.append("mc_file", fileInput.files[0]);
+  if (fileInput.files[0]) {
+    // CHANGED: Use "mc" to match your leaveRoutes.js upload.single("mc")
+    fd.append("mc", fileInput.files[0]);
+  }
 
   try {
-    const res = await fetch("/api/leaves", { method: "POST", body: fd });
+    const res = await fetch("/api/leaves", { 
+      method: "POST", 
+      body: fd 
+    });
+
     if (res.ok) {
-      alert("Leave request submitted.");
+      alert("Leave request submitted successfully!");
       location.reload();
+    } else {
+      const errorData = await res.json();
+      alert("Submission failed: " + (errorData.message || "Server Error"));
     }
-  } catch (error) { console.error(error); }
+  } catch (error) { 
+    console.error("Submission error:", error);
+    alert("An error occurred. Check if the 'uploads/mc' folder exists on your server.");
+  }
 }
 
 async function loadLeaves(info, success) {
