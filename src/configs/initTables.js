@@ -238,6 +238,7 @@ const authPool = require("../services/authDb"); // Required to bridge the two da
         end_date DATE NOT NULL,
         leave_type VARCHAR(100) NOT NULL,
         reason TEXT,
+        days_count INT,
         status ENUM('pending','approved','rejected') DEFAULT 'pending',
         approved_by INT,
         approved_at TIMESTAMP NULL,
