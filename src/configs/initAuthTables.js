@@ -57,14 +57,6 @@ const bcrypt = require("bcrypt");
     // Array of default users to create/update
     const defaultUsers = [
       {
-        username: "nainglinhtet",
-        email: "nainglinhtet.2005@gmail.com",
-        full_name: "Naing Lin Htet",
-        password: hashedPassword,
-        role_id: 1,
-        active: true
-      },
-      {
         username: "admin",
         email: "admin@meganet.com.sg",
         full_name: "System Administrator",
@@ -93,6 +85,22 @@ const bcrypt = require("bcrypt");
         full_name: "Full-time User",
         password: hashedDefaultPassword,
         role_id: 4,
+        active: true
+      },
+      {
+        username: "nainglinhtet",
+        email: "nainglinhtet.2005@gmail.com",
+        full_name: "Naing Lin Htet",
+        password: hashedPassword,
+        role_id: 1,
+        active: true
+      },
+      {
+        username: "LeeChauWen",
+        email: "chauwenlee@meganet.com.sg",
+        full_name: "Lee Chau Wen",
+        password: hashedPassword,
+        role_id: 1,
         active: true
       }
     ];
