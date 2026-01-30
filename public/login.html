@@ -124,7 +124,7 @@
         message.style.color = "black";
 
         try {
-          const res = await fetch("/api/users/login", {
+          const res = await fetch("/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password })
@@ -134,13 +134,24 @@
           console.log("📬 Login response:", result);
 
           if (res.ok && result.user) {
-            // ✅ Save user info to localStorage
+            // ✅ Save user info and token to localStorage
             localStorage.setItem("user", JSON.stringify(result.user));
+            localStorage.setItem("token", result.token);
             message.style.color = "green";
             message.textContent = "✅ Login successful! Redirecting...";
 
             setTimeout(() => {
-              window.location.href = "index.html";
+              // Check if redirected from inventory system
+              const urlParams = new URLSearchParams(window.location.search);
+              const returnUrl = urlParams.get('returnUrl');
+              
+              if (returnUrl) {
+                // Return to inventory system with token
+                window.location.href = `${returnUrl}?token=${result.token}`;
+              } else {
+                // Go to portal
+                window.location.href = "index.html";
+              }
             }, 800);
           } else {
             message.style.color = "red";

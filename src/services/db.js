@@ -1,12 +1,13 @@
 // ✅ Use the promise-based version of mysql2
 const mysql = require("mysql2/promise");
+require('dotenv').config();
 
 // ✅ Create the connection pool
 const pool = mysql.createPool({
-  host: "localhost",
-  user: "root",         // change this if your DB username is different
-  password: "",         // add your DB password if any
-  database: "meganet",  // your database name
+  host: process.env.DB_HOST || "localhost",
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  database: process.env.DB_NAME || "meganet",
   waitForConnections: true,
   dateStrings: true,
   connectionLimit: 10,

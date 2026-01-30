@@ -116,6 +116,16 @@
       font-size: 0.95rem;
     }
 
+    .external-links a.offline {
+      color: #ff4757;
+      cursor: not-allowed;
+      text-decoration: line-through;
+    }
+
+    .external-links a.offline:hover {
+      color: #e84118;
+    }
+
     footer {
       margin-top: 25px;
       font-size: 0.9rem;
@@ -144,6 +154,7 @@
       <a href="#" target="_blank">Noise Monitoring Dashboard</a>
       <a href="#" target="_blank">Try-On Fashion MVP</a>
       <a href="#" target="_blank">IoT Alert Visualization</a>
+      <a id="inventoryLink" href="http://127.0.0.1:3300/INV_users/home.html" target="_blank">Inventory System</a>
     </div>
 
     <button id="logoutBtn">Logout</button>
@@ -156,7 +167,42 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
+    const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const INVENTORY_FALLBACK = "http://127.0.0.1:3300/INV_users/home.html";
+    const INVENTORY_SET_COOKIE_FALLBACK = "http://127.0.0.1:3300/api/set-auth-cookie";
+
+    function getQueryParam(name) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(name);
+    }
+
+    // Check if Inventory System is online
+    async function checkInventorySystemStatus() {
+      const inventoryLink = document.getElementById("inventoryLink");
+      if (!inventoryLink) return;
+
+      try {
+        const response = await fetch("http://127.0.0.1:3300/", {
+          method: "HEAD",
+          mode: "no-cors",
+          timeout: 3000
+        });
+        // If request succeeds, system is online
+        inventoryLink.classList.remove("offline");
+        inventoryLink.textContent = "Inventory System";
+        inventoryLink.style.pointerEvents = "auto";
+      } catch (error) {
+        // If request fails, system is offline
+        inventoryLink.classList.add("offline");
+        inventoryLink.textContent = "Inventory System (Offline)";
+        inventoryLink.style.pointerEvents = "none";
+        inventoryLink.setAttribute("onclick", "return false;");
+      }
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
+      // Check inventory system status on page load
+      checkInventorySystemStatus();
       const user = JSON.parse(localStorage.getItem("user"));
 
       if (!user) {
@@ -187,10 +233,63 @@
         });
       }
 
+      // Enhanced Inventory Navigation with Token Handling
+      const inventoryLink = document.getElementById("inventoryLink");
+      if (inventoryLink) {
+        inventoryLink.addEventListener("click", function(e) {
+          e.preventDefault();
+
+          const token = localStorage.getItem("token");
+          if (!token) {
+            console.error("[PORTAL] No token found in localStorage");
+            window.location.href = INVENTORY_FALLBACK;
+            return;
+          }
+
+          console.log("[PORTAL] Token found, preparing cross-system navigation");
+          console.log(`[PORTAL] Token preview: ${token.substring(0, 20)}...`);
+
+          // Set token in localStorage for future navigation
+          localStorage.setItem("inventoryToken", token);
+
+          // Set token in local cookie
+          document.cookie = `authToken=${token}; path=/; SameSite=Lax`;
+          console.log("[PORTAL] Token set to local cookie");
+
+          // Try to set cookie on inventory system domain
+          const setCookieUrl = `${INVENTORY_SET_COOKIE_FALLBACK}?token=${encodeURIComponent(token)}`;
+          fetch(setCookieUrl, {
+            method: "GET",
+            credentials: "include",
+            headers: { "Accept": "application/json" }
+          })
+            .then(r => r.json())
+            .then(data => {
+              console.log("[PORTAL] Inventory system cookie set response:", data);
+              // Navigate with token as query parameter
+              const navigationUrl = `${INVENTORY_FALLBACK}?token=${encodeURIComponent(token)}`;
+              window.location.href = navigationUrl;
+            })
+            .catch(err => {
+              console.error("[PORTAL] Failed to set inventory cookie:", err.message);
+              // Fallback: navigate with token as query parameter
+              const navigationUrl = `${INVENTORY_FALLBACK}?token=${encodeURIComponent(token)}`;
+              window.location.href = navigationUrl;
+            });
+        });
+      }
+
       // Logout handler
       document.getElementById("logoutBtn").addEventListener("click", () => {
         console.log("🚪 Logging out...");
         localStorage.removeItem("user");
+        localStorage.removeItem("token");
+        localStorage.removeItem("inventoryToken");
+        
+        // Clear cookies with multiple methods for cross-browser compatibility
+        document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/INV_users/;";
+        
         window.location.href = "login.html";
       });
     });

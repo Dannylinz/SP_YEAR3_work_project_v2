@@ -30,6 +30,40 @@ if (!fs.existsSync(uploadDir)) {
 app.use(cors());
 app.use(bodyParser.json());
 
+//////////////////////////////////////////////////////
+// 🔍 REQUEST/RESPONSE LOGGING MIDDLEWARE
+//////////////////////////////////////////////////////
+app.use((req, res, next) => {
+  const start = Date.now();
+  const timestamp = new Date().toISOString();
+  const clientIp = req.ip || req.connection.remoteAddress;
+
+  console.log(`\n📥 [AUTH-SYSTEM:3000] INCOMING REQUEST`);
+  console.log(`   - Timestamp: ${timestamp}`);
+  console.log(`   - Client IP: ${clientIp}`);
+  console.log(`   - Method: ${req.method}`);
+  console.log(`   - Path: ${req.path}`);
+  if (Object.keys(req.query).length > 0) {
+    console.log(`   - Query: ${JSON.stringify(req.query)}`);
+  }
+
+  // Intercept res.json to log response
+  const originalJson = res.json;
+  res.json = function(data) {
+    const duration = Date.now() - start;
+    console.log(`📤 [AUTH-SYSTEM:3000] OUTGOING RESPONSE`);
+    console.log(`   - Status: ${res.statusCode}`);
+    console.log(`   - Duration: ${duration}ms`);
+    if (typeof data === 'object' && Object.keys(data).length < 5) {
+      console.log(`   - Response: ${JSON.stringify(data).substring(0, 100)}`);
+    }
+    console.log(`   ============================================================`);
+    return originalJson.call(this, data);
+  };
+
+  next();
+});
+
 // ✅ Serve static files first
 app.use("/uploads", express.static(uploadDir)); // Serve uploaded files properly
 app.use(express.static(path.join(__dirname, "public"))); // Serve HTML/JS/CSS

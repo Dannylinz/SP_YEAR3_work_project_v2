@@ -48,30 +48,75 @@ const bcrypt = require("bcrypt");
     console.log("✅ Table 'User' created with Role relationship");
 
     // ----------------------------
-    // Always ensure admin exists with correct bcrypt hash
+    // Ensure default users exist with correct bcrypt hash
     const plainPassword = "123";
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
+    const defaultPassword = "Meganet@6688";
+    const hashedDefaultPassword = await bcrypt.hash(defaultPassword, 10);
 
-    // Delete any existing admin with same email to avoid mismatch
-    await authPool.query(
-      `DELETE FROM User WHERE email = ?`,
-      ["nainglinhtet.2005@gmail.com"]
-    );
+    // Array of default users to create/update
+    const defaultUsers = [
+      {
+        username: "nainglinhtet",
+        email: "nainglinhtet.2005@gmail.com",
+        full_name: "Naing Lin Htet",
+        password: hashedPassword,
+        role_id: 1,
+        active: true
+      },
+      {
+        username: "admin",
+        email: "admin@meganet.com.sg",
+        full_name: "System Administrator",
+        password: hashedDefaultPassword,
+        role_id: 1,
+        active: true
+      },{
+        username: "Intern",
+        email: "intern@meganet.com.sg",
+        full_name: "Intern User",
+        password: hashedDefaultPassword,
+        role_id: 2,
+        active: true
+      },
+      {
+        username: "Part-timer",
+        email: "parttimer@meganet.com.sg",
+        full_name: "Part-time User",
+        password: hashedDefaultPassword,
+        role_id: 3,
+        active: true
+      },
+      {
+        username: "Full-timer",
+        email: "fulltimer@meganet.com.sg",
+        full_name: "Full-time User",
+        password: hashedDefaultPassword,
+        role_id: 4,
+        active: true
+      }
+    ];
 
-    // Insert fresh admin
-    await authPool.query(`
-      INSERT INTO User (username, email, full_name, password, role_id, active)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [
-      "admin",
-      "nainglinhtet.2005@gmail.com",
-      "Naing Lin Htet",
-      hashedPassword,
-      1, // Admin role
-      true
-    ]);
+    // Insert or update default users (avoid deleting to preserve foreign key relationships)
+    for (const user of defaultUsers) {
+      await authPool.query(`
+        INSERT INTO User (username, email, full_name, password, role_id, active)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          password = VALUES(password),
+          role_id = VALUES(role_id),
+          active = VALUES(active)
+      `, [
+        user.username,
+        user.email,
+        user.full_name,
+        user.password,
+        user.role_id,
+        user.active
+      ]);
+      console.log(`✅ Default user inserted/updated (email: ${user.email} | password: 123)`);
+    }
 
-    console.log("✅ Default admin user inserted (email: nainglinhtet.2005@gmail.com | password: 123)");
     console.log("🎉 Auth DB setup complete! (User & Role ready)");
 
     process.exit(0);

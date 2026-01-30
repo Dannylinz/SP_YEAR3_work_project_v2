@@ -4,7 +4,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "init-db": "node src/configs/initTables.js"
+    "init-db": "node src/configs/initTables.js",
+    "init_auth_tables": "node src/configs/initAuthTables.js",
+    "init-all": "node src/configs/initTables.js && node src/configs/initAuthTables.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

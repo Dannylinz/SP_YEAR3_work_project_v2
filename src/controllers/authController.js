@@ -2,9 +2,10 @@
 const pool = require("../services/authDb");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+require('dotenv').config();
 
-const JWT_SECRET = "SUPER_SECRET_CHANGE_THIS"; // use env var later
-const JWT_EXPIRES_IN = "8h";
+const JWT_SECRET = process.env.JWT_SECRET_KEY || "SUPER_SECRET_CHANGE_THIS";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "8h";
 
 exports.register = async (req, res) => {
   try {
@@ -14,7 +15,7 @@ exports.register = async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
-      "INSERT INTO Users (username, email, password_hash, role_id) VALUES (?, ?, ?, ?)",
+      "INSERT INTO User (username, email, password, role_id) VALUES (?, ?, ?, ?)",
       [username, email, hash, role_id]
     );
 
@@ -33,11 +34,11 @@ exports.login = async (req, res) => {
     if (!email || !password)
       return res.status(400).json({ message: "Missing credentials" });
 
-    const [rows] = await pool.query("SELECT * FROM Users WHERE email = ?", [email]);
+    const [rows] = await pool.query("SELECT * FROM User WHERE email = ?", [email]);
     const user = rows[0];
     if (!user) return res.status(401).json({ message: "Invalid login" });
 
-    const ok = await bcrypt.compare(password, user.password_hash);
+    const ok = await bcrypt.compare(password, user.password);
     if (!ok) return res.status(401).json({ message: "Invalid login" });
 
     const token = jwt.sign(
@@ -48,7 +49,10 @@ exports.login = async (req, res) => {
         role_id: user.role_id,
       },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      { 
+        expiresIn: JWT_EXPIRES_IN,
+        audience: process.env.JWT_AUDIENCE || 'meganet-api'
+      }
     );
 
     res.json({
@@ -64,5 +68,41 @@ exports.login = async (req, res) => {
   } catch (err) {
     console.error("❌ [login]", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ✅ New endpoint: Verify token from other systems
+exports.verifyToken = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || req.body.token || req.query.token;
+    
+    if (!token) {
+      return res.status(400).json({ message: "Token required", valid: false });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Optionally fetch fresh user data from database
+    const [rows] = await pool.query("SELECT * FROM User WHERE user_id = ?", [decoded.user_id]);
+    const user = rows[0];
+    
+    if (!user || !user.active) {
+      return res.status(401).json({ message: "User inactive or not found", valid: false });
+    }
+
+    res.json({
+      valid: true,
+      message: "Token is valid",
+      user: {
+        user_id: user.user_id,
+        username: user.username,
+        email: user.email,
+        role_id: user.role_id,
+      },
+      decoded: decoded
+    });
+  } catch (err) {
+    console.error("❌ [verifyToken]", err);
+    res.status(401).json({ message: "Invalid token", valid: false });
   }
 };
