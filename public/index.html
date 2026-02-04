@@ -126,6 +126,26 @@
       color: #e84118;
     }
 
+    .external-links a.backup-mode {
+      color: #ff9800;
+      font-weight: 600;
+    }
+
+    .external-links a.backup-mode::before {
+      content: "⚠️ ";
+    }
+
+    .backup-notification {
+      background: #ff9800;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 8px;
+      margin: 10px 0;
+      font-size: 0.9rem;
+      display: none;
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
     footer {
       margin-top: 25px;
       font-size: 0.9rem;
@@ -155,6 +175,7 @@
       <a href="#" target="_blank">Try-On Fashion MVP</a>
       <a href="#" target="_blank">IoT Alert Visualization</a>
       <a id="inventoryLink" href="https://inventory.mnproject.xyz/INV_users/home.html" target="_blank">Inventory System</a>
+      <div id="backupNotification" class="backup-notification"></div>
     </div>
 
     <button id="logoutBtn">Logout</button>
@@ -168,8 +189,17 @@
 
   <script>
     const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-    const INVENTORY_FALLBACK = "https://inventory.mnproject.xyz/INV_users/home.html";
-    const INVENTORY_SET_COOKIE_FALLBACK = "https://inventory.mnproject.xyz/api/set-auth-cookie";
+    const INVENTORY_PRIMARY = "https://inventory.mnproject.xyz";
+    const INVENTORY_BACKUP = "http://127.0.0.1:3300";
+    const INVENTORY_FALLBACK = INVENTORY_PRIMARY + "/INV_users/home.html";
+    const INVENTORY_BACKUP_URL = INVENTORY_BACKUP + "/INV_users/home.html";
+    const INVENTORY_SET_COOKIE_FALLBACK = INVENTORY_PRIMARY + "/api/set-auth-cookie";
+    const INVENTORY_SET_COOKIE_BACKUP = INVENTORY_BACKUP + "/api/set-auth-cookie";
+
+    let inventorySystemUrl = INVENTORY_PRIMARY;
+    let inventoryHomeUrl = INVENTORY_FALLBACK;
+    let inventoryCookieUrl = INVENTORY_SET_COOKIE_FALLBACK;
+    let isBackupMode = false;
 
     function getQueryParam(name) {
       const urlParams = new URLSearchParams(window.location.search);
@@ -179,24 +209,74 @@
     // Check if Inventory System is online
     async function checkInventorySystemStatus() {
       const inventoryLink = document.getElementById("inventoryLink");
+      const backupNotification = document.getElementById("backupNotification");
       if (!inventoryLink) return;
 
+      console.log("[PORTAL] 🔍 Checking Inventory System availability at:", INVENTORY_PRIMARY);
+
       try {
-        const response = await fetch("https://inventory.mnproject.xyz/", {
-          method: "HEAD",
-          mode: "no-cors",
-          timeout: 3000
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+
+        const response = await fetch(INVENTORY_PRIMARY + "/api/health", {
+          method: "GET",
+          signal: controller.signal
         });
-        // If request succeeds, system is online
-        inventoryLink.classList.remove("offline");
-        inventoryLink.textContent = "Inventory System";
-        inventoryLink.style.pointerEvents = "auto";
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          // Primary server is online
+          console.log("[PORTAL] ✅ Primary Inventory System is ONLINE");
+          inventoryLink.classList.remove("offline", "backup-mode");
+          inventoryLink.textContent = "Inventory System";
+          inventoryLink.style.pointerEvents = "auto";
+          inventorySystemUrl = INVENTORY_PRIMARY;
+          inventoryHomeUrl = INVENTORY_FALLBACK;
+          inventoryCookieUrl = INVENTORY_SET_COOKIE_FALLBACK;
+          isBackupMode = false;
+        } else {
+          throw new Error("Server returned error: " + response.status);
+        }
       } catch (error) {
-        // If request fails, system is offline
-        inventoryLink.classList.add("offline");
-        inventoryLink.textContent = "Inventory System (Offline)";
-        inventoryLink.style.pointerEvents = "none";
-        inventoryLink.setAttribute("onclick", "return false;");
+        // Primary system is offline, try backup
+        console.warn("[PORTAL] ⚠️ Primary Inventory System is DOWN:", error.message);
+        console.log("[PORTAL] 🔄 Attempting to connect to BACKUP server:", INVENTORY_BACKUP);
+
+        try {
+          const backupResponse = await fetch(INVENTORY_BACKUP + "/api/health", {
+            method: "GET"
+          });
+
+          if (backupResponse.ok) {
+            // Backup server is online
+            console.log("[PORTAL] ✅ BACKUP Inventory System is ONLINE - Redirecting to backup");
+            inventoryLink.classList.remove("offline");
+            inventoryLink.classList.add("backup-mode");
+            inventoryLink.textContent = "Inventory System (Backup Server)";
+            inventoryLink.style.pointerEvents = "auto";
+            inventorySystemUrl = INVENTORY_BACKUP;
+            inventoryHomeUrl = INVENTORY_BACKUP_URL;
+            inventoryCookieUrl = INVENTORY_SET_COOKIE_BACKUP;
+            isBackupMode = true;
+
+            // Show backup notification
+            if (backupNotification) {
+              backupNotification.textContent = "⚠️ Primary server unavailable - Will redirect to backup server (127.0.0.1:3300)";
+              backupNotification.style.display = "block";
+            }
+          } else {
+            throw new Error("Backup server returned error");
+          }
+        } catch (backupError) {
+          // Both systems are offline
+          console.error("[PORTAL] ❌ Both Primary and Backup Inventory Systems are OFFLINE");
+          inventoryLink.classList.add("offline");
+          inventoryLink.classList.remove("backup-mode");
+          inventoryLink.textContent = "Inventory System (Offline)";
+          inventoryLink.style.pointerEvents = "none";
+          inventoryLink.setAttribute("onclick", "return false;");
+        }
       }
     }
 
@@ -242,12 +322,18 @@
           const token = localStorage.getItem("token");
           if (!token) {
             console.error("[PORTAL] No token found in localStorage");
-            window.location.href = INVENTORY_FALLBACK;
+            window.location.href = inventoryHomeUrl;
             return;
           }
 
           console.log("[PORTAL] Token found, preparing cross-system navigation");
           console.log(`[PORTAL] Token preview: ${token.substring(0, 20)}...`);
+          
+          if (isBackupMode) {
+            console.log("[PORTAL] 🔧 BACKUP MODE - Redirecting to:", inventoryHomeUrl);
+          } else {
+            console.log("[PORTAL] 🌐 NORMAL MODE - Redirecting to:", inventoryHomeUrl);
+          }
 
           // Set token in localStorage for future navigation
           localStorage.setItem("inventoryToken", token);
@@ -257,7 +343,7 @@
           console.log("[PORTAL] Token set to local cookie");
 
           // Try to set cookie on inventory system domain
-          const setCookieUrl = `${INVENTORY_SET_COOKIE_FALLBACK}?token=${encodeURIComponent(token)}`;
+          const setCookieUrl = `${inventoryCookieUrl}?token=${encodeURIComponent(token)}`;
           fetch(setCookieUrl, {
             method: "GET",
             credentials: "include",
@@ -267,13 +353,15 @@
             .then(data => {
               console.log("[PORTAL] Inventory system cookie set response:", data);
               // Navigate with token as query parameter
-              const navigationUrl = `${INVENTORY_FALLBACK}?token=${encodeURIComponent(token)}`;
+              const navigationUrl = `${inventoryHomeUrl}?token=${encodeURIComponent(token)}`;
+              console.log("[PORTAL] ➡️ Navigating to:", navigationUrl);
               window.location.href = navigationUrl;
             })
             .catch(err => {
               console.error("[PORTAL] Failed to set inventory cookie:", err.message);
               // Fallback: navigate with token as query parameter
-              const navigationUrl = `${INVENTORY_FALLBACK}?token=${encodeURIComponent(token)}`;
+              const navigationUrl = `${inventoryHomeUrl}?token=${encodeURIComponent(token)}`;
+              console.log("[PORTAL] ➡️ Fallback navigation to:", navigationUrl);
               window.location.href = navigationUrl;
             });
         });
@@ -282,6 +370,8 @@
       // Logout handler
       document.getElementById("logoutBtn").addEventListener("click", () => {
         console.log("🚪 Logging out...");
+        
+        // Clear portal authentication data
         localStorage.removeItem("user");
         localStorage.removeItem("token");
         localStorage.removeItem("inventoryToken");
@@ -290,7 +380,34 @@
         document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
         document.cookie = "authToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/INV_users/;";
         
-        window.location.href = "login.html";
+        console.log("[PORTAL] Portal authentication data cleared");
+        
+        // Also clear inventory system's localStorage by loading logout page in hidden iframe
+        const inventoryLogoutUrl = `${inventorySystemUrl}/INV_public/logout.html`;
+        console.log("[PORTAL] Triggering inventory system logout at:", inventoryLogoutUrl);
+        
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = inventoryLogoutUrl;
+        document.body.appendChild(iframe);
+        
+        // Wait for logout confirmation or timeout
+        let logoutComplete = false;
+        window.addEventListener('message', function(event) {
+          if (event.data && event.data.type === 'inventory-logout-complete') {
+            console.log("[PORTAL] ✅ Inventory system logout confirmed");
+            logoutComplete = true;
+          }
+        });
+        
+        // Redirect to login after 1 second (or when confirmed)
+        setTimeout(() => {
+          if (iframe.parentNode) {
+            iframe.parentNode.removeChild(iframe);
+          }
+          console.log("[PORTAL] Redirecting to login page");
+          window.location.href = "login.html";
+        }, 1000);
       });
     });
   </script>

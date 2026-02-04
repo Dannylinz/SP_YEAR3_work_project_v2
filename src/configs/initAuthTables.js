@@ -94,14 +94,6 @@ const bcrypt = require("bcrypt");
         password: hashedPassword,
         role_id: 1,
         active: true
-      },
-      {
-        username: "LeeChauWen",
-        email: "chauwenlee@meganet.com.sg",
-        full_name: "Lee Chau Wen",
-        password: hashedPassword,
-        role_id: 1,
-        active: true
       }
     ];
 
