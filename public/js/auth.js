@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (e) {
       console.warn("[auth.js] Invalid user data in localStorage, clearing.", e);
       localStorage.removeItem("user");
+      localStorage.removeItem("token");
       user = null;
     }
   }
@@ -45,7 +46,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", () => {
+      // Remove both user and token from localStorage
       localStorage.removeItem("user");
+      localStorage.removeItem("token");
       alert("You have logged out.");
       window.location.href = "login.html";
     });
